@@ -170,15 +170,7 @@ The upstream Shijima-Qt README is available at [Shijima-Qt_README.md](Shijima-Qt
 ---
 ## Ads
 
-If you're interested in Neuro fan fiction, please join the literary society~
-
-**NeuroEcho Literary Society QQ Group: 1063898428**
-
-Please join the NeuroSama Bar group~
-
-**NeuroSama Bar QQ Group: 734688012**
-
-**EvilNeuro Bar QQ Group: 1072864404**
+(If you need promotion, please contact me.)
 
 ---
 
