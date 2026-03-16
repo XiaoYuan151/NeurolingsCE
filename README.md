@@ -170,15 +170,11 @@ NeurolingsCE/
 ---
 ## 广告位
 
+(如果你需要宣传请来联系我)
+
 如果你对neuro同人文感兴趣的话，请加入文学社谢谢喵
 
 **NeuroEcho文学社QQ群1063898428**
-
-请加入NeuroSama吧群谢谢喵
-
-**NeuroSama吧QQ群734688012**
-
-**EvilNeuro吧QQ群1072864404**
 
 ---
 
