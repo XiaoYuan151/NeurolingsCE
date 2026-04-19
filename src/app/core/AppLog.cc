@@ -254,6 +254,10 @@ void write(Level level, char const *category, std::string const& message,
         QString::fromUtf8(message.c_str()), file, line, function));
 }
 
+void writeCrash(char const *category, std::string const& message) {
+    write(Level::Error, category, message, nullptr, 0, nullptr);
+}
+
 QString sessionLogPath() {
     if (g_logFile != nullptr) {
         return g_logFile->fileName();

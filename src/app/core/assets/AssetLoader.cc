@@ -19,6 +19,7 @@
 #include "shijima-qt/AssetLoader.hpp"
 #include "shijima-qt/Asset.hpp"
 #include "shijima-qt/DefaultMascot.hpp"
+#include "shijima-qt/AppLog.hpp"
 #include <QDir>
 #include <QDir>
 
@@ -45,17 +46,24 @@ Asset const& AssetLoader::loadAsset(QString path) {
     if (!m_assets.contains(path)) {
         Asset &asset = m_assets[path];
         QImage image;
+        bool loaded = false;
         if (path.startsWith("@")) {
             auto filename = path.sliced(path.lastIndexOf('/') + 1)
                 .toStdString();
             if (defaultMascot.count(filename) == 1) {
                 auto &file = defaultMascot.at(filename);
-                image.loadFromData((const uchar *)file.first,
+                loaded = image.loadFromData((const uchar *)file.first,
                     (int)file.second);
             }
         }
         else {
-            image.load(path);
+            loaded = image.load(path);
+        }
+        if (!loaded || image.isNull()) {
+            APP_LOG_ERROR("asset") << "Failed to load image asset path=\""
+                << path.toStdString() << "\"; using transparent placeholder";
+            image = QImage { 1, 1, QImage::Format_ARGB32_Premultiplied };
+            image.fill(Qt::transparent);
         }
         asset.setImage(image);
     }

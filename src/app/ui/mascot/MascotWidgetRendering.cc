@@ -31,6 +31,12 @@
 
 Asset const& ShijimaWidget::getActiveAsset() {
     auto &name = m_mascot->state->active_frame.get_name(m_mascot->state->looking_right);
+    if (name.empty()) {
+        APP_LOG_ERROR("mascot") << "Active frame name is empty for mascotId="
+            << m_mascotId << " name=\"" << m_data->name().toStdString()
+            << "\"; using transparent placeholder";
+        return AssetLoader::defaultLoader()->loadAsset(QStringLiteral("@/img/__missing__.png"));
+    }
     std::string lowerName = name;
     std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(),
                    [](unsigned char c) { return (char)std::tolower(c); });

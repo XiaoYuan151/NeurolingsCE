@@ -36,6 +36,7 @@ void initialize(QCoreApplication *app);
 void shutdown();
 void write(Level level, char const *category, std::string const& message,
     char const *file, int line, char const *function);
+void writeCrash(char const *category, std::string const& message);
 QString sessionLogPath();
 QString sessionLogDirectoryPath();
 
