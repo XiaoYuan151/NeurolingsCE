@@ -56,6 +56,11 @@ void ShijimaManager::setupHomePage() {
     connect(btnImport, &ElaPushButton::clicked, this, &ShijimaManager::importAction);
     actionRow->addWidget(btnImport);
 
+    auto *btnRefresh = new ElaPushButton(tr("Refresh"));
+    configureActionButton(btnRefresh);
+    connect(btnRefresh, &ElaPushButton::clicked, this, &ShijimaManager::syncMascotLibrary);
+    actionRow->addWidget(btnRefresh);
+
     auto *btnDelete = new ElaPushButton(tr("Delete"));
     configureActionButton(btnDelete);
     connect(btnDelete, &ElaPushButton::clicked, this, &ShijimaManager::deleteAction);

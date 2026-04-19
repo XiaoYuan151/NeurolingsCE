@@ -51,6 +51,10 @@
         <translation>导入</translation>
     </message>
     <message>
+        <source>Refresh</source>
+        <translation>刷新</translation>
+    </message>
+    <message>
         <source>Delete</source>
         <translation>删除</translation>
     </message>

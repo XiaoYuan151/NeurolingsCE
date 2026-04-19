@@ -153,6 +153,11 @@ void ShijimaManager::reloadMascot(QString const& name) {
 }
 
 void ShijimaManager::refreshListWidget() {
+    QSet<QString> selectedNames;
+    for (auto *item : m_ui->listWidget->selectedItems()) {
+        selectedNames.insert(item->text());
+    }
+
     m_ui->listWidget->clear();
     auto names = m_runtime->loadedMascots.keys();
     names.sort(Qt::CaseInsensitive);
@@ -160,9 +165,13 @@ void ShijimaManager::refreshListWidget() {
         auto item = new QListWidgetItem;
         item->setText(name);
         item->setIcon(m_runtime->loadedMascots[name]->preview());
+        if (selectedNames.contains(name)) {
+            item->setSelected(true);
+        }
         m_ui->listWidget->addItem(item);
     }
     m_runtime->listItemsToRefresh.clear();
+    updateStatusBar();
 }
 
 void ShijimaManager::loadAllMascots() {
@@ -175,6 +184,36 @@ void ShijimaManager::loadAllMascots() {
         }
         reloadMascot(name.sliced(0, name.length() - 7));
     }
+    refreshListWidget();
+}
+
+void ShijimaManager::syncMascotLibrary() {
+    QSet<QString> mascotsOnDisk;
+    QDirIterator iter { m_runtime->mascotsPath, QDir::Dirs | QDir::NoDotAndDotDot,
+        QDirIterator::NoIteratorFlags };
+    while (iter.hasNext()) {
+        auto name = iter.nextFileInfo().fileName();
+        if (!name.endsWith(".mascot") || name.length() <= 7) {
+            continue;
+        }
+        mascotsOnDisk.insert(name.sliced(0, name.length() - 7));
+    }
+
+    auto loadedNames = m_runtime->loadedMascots.keys();
+    for (auto const& name : loadedNames) {
+        auto *data = m_runtime->loadedMascots.value(name, nullptr);
+        if (data == nullptr || !data->deletable()) {
+            continue;
+        }
+        if (!mascotsOnDisk.contains(name)) {
+            reloadMascot(name);
+        }
+    }
+
+    for (auto const& name : mascotsOnDisk) {
+        reloadMascot(name);
+    }
+
     refreshListWidget();
 }
 

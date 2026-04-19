@@ -99,6 +99,7 @@ private:
     void itemDoubleClicked(QListWidgetItem *qItem);
     void reloadMascots(std::set<std::string> const& mascots);
     void loadAllMascots();
+    void syncMascotLibrary();
     void refreshListWidget();
     void setupNavigation();
     void setupHomePage();
