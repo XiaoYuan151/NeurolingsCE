@@ -166,6 +166,11 @@ NeurolingsCE/
 - [cpp-httplib](https://github.com/yhirose/cpp-httplib) — HTTP 库
 - [Qt 6](https://www.qt.io/) — GUI 框架
 
+软件 ICO 致谢：
+- 感谢 [宅笙Zhai_Sheng](https://space.bilibili.com/49541366) 绘制软件 ICO
+
+
+
 ## 联系方式
 
 - **作者**：[轻尘呦](https://space.bilibili.com/178381315)
@@ -175,7 +180,7 @@ NeurolingsCE/
 - **交流 QQ 群**：125081756
 
 **如果你对neuro社区项目开发感兴趣的话**
-  
+
 **可以联系我加入NeuForge Center**
 
 **请加入STNC了解更多内容**
@@ -190,7 +195,7 @@ NeurolingsCE/
 
 上游项目 Shijima-Qt 的 README 见 [Shijima-Qt_README.md](Shijima-Qt_README.md)。
 
-![](https://qingchenyou-1301914189.cos.ap-beijing.myqcloud.com/681dcdd42da7fc5484c1dd3a9875b54a_324.png)
+![NeurolingsCE icon](src/packaging/io.github.qingchenyouforcc.NeurolingsCE.png)
 
 ---
 ## 广告位

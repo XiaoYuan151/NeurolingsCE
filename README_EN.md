@@ -167,6 +167,9 @@ Core dependencies:
 - [cpp-httplib](https://github.com/yhirose/cpp-httplib) — HTTP library
 - [Qt 6](https://www.qt.io/) — GUI framework
 
+ICO credits:
+- Thanks to [宅笙Zhai_Sheng](https://space.bilibili.com/49541366) for creating the application ICO
+
 ## Contact
 
 - **Author**: [轻尘呦](https://space.bilibili.com/178381315)
@@ -191,7 +194,7 @@ This project is open-sourced under the [GNU General Public License v3.0](LICENSE
 
 The upstream Shijima-Qt README is available at [Shijima-Qt_README.md](Shijima-Qt_README.md).
 
-![](https://qingchenyou-1301914189.cos.ap-beijing.myqcloud.com/681dcdd42da7fc5484c1dd3a9875b54a_324.png)
+![NeurolingsCE icon](src/packaging/io.github.qingchenyouforcc.NeurolingsCE.png)
 
 ---
 ## Ads
