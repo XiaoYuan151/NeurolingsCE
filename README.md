@@ -107,14 +107,28 @@ CONFIG=release make -j$(nproc)
 
 ## CLI
 
-主程序同时提供面向脚本/agent 的 CLI，默认连接到已运行实例的
-`127.0.0.1:32456`。
+项目现在提供独立的控制台 CLI 程序 `NeurolingsCE-cli`。模板管理命令可独立运行；
+运行时 mascot 控制命令会在需要时自动启动 NeurolingsCE 运行时，再通过本地 IPC 控制它。
 
-- 全局选项：`--quiet`、`--json`、`--host`、`--port`、`--connect-timeout-ms`、`--read-timeout-ms`
-- 命令：`list`、`list-loaded`、`spawn`、`alter`、`dismiss`、`dismiss-all`
+- 全局选项：`--quiet`、`--json`、`--connect-timeout-ms`、`--read-timeout-ms`
+- 文档命令：`--help/-h`、`--summon/-s`、`--close`、`--close-all`、`--stop`、`--mascot/-m`、`--list/-l`、`--version/-v`
+- `--summon` 支持两种形式：
+  - `--summon mascot --name NAME [label]`
+  - `--summon mascot --data-id ID [label]`
+  - `--summon random [label]`
+- `label` 是面向用户的 CLI 标签，不等于运行时 mascot ID，只在当前应用进程存活期间有效
+- `--mascot/-m` 支持模板管理：
+  - `--mascot list`
+  - `--mascot add ZIP`
+  - `--mascot remove MASCOT`
+- `--mascot/-m` 不需要主程序已运行；它直接读写本机模板目录
+- `--stop` 会关闭全部桌宠并停止 NeurolingsCE 运行时；如果运行时未启动，不会为了停止而新启动它
+- 兼容旧命令：`list`、`list-loaded`、`spawn`、`alter`、`dismiss`、`dismiss-all`
 - `--json` 会输出稳定的结构化结果与错误对象
+- `--host` 和 `--port` 不再支持；CLI 不走 HTTP
+- 在 Windows 上建议直接调用 `NeurolingsCE-cli.exe`，这样 shell/agent 能稳定获取退出码
 
-详细命令格式与 HTTP API 约定见 [src/docs/HTTP-API.md](src/docs/HTTP-API.md)。
+详细命令格式见 [src/docs/HTTP-API.md](src/docs/HTTP-API.md) 中的 CLI 部分。
 
 ## 项目结构
 

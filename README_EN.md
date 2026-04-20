@@ -107,15 +107,29 @@ See detailed documentation at [src/docs/HTTP-API.md](src/docs/HTTP-API.md).
 
 ## CLI
 
-The main executable also provides a script/agent-friendly CLI that talks to an
-already running instance on `127.0.0.1:32456` by default.
+The project now provides a dedicated console CLI binary, `NeurolingsCE-cli`.
+Template-management commands run standalone; runtime mascot-control commands
+auto-start the NeurolingsCE runtime when needed, then talk to it over local IPC.
 
-- Global options: `--quiet`, `--json`, `--host`, `--port`, `--connect-timeout-ms`, `--read-timeout-ms`
-- Commands: `list`, `list-loaded`, `spawn`, `alter`, `dismiss`, `dismiss-all`
+- Global options: `--quiet`, `--json`, `--connect-timeout-ms`, `--read-timeout-ms`
+- Document-style commands: `--help/-h`, `--summon/-s`, `--close`, `--close-all`, `--stop`, `--mascot/-m`, `--list/-l`, `--version/-v`
+- `--summon` supports two forms:
+  - `--summon mascot --name NAME [label]`
+  - `--summon mascot --data-id ID [label]`
+  - `--summon random [label]`
+- `label` is a user-facing CLI label, not the runtime mascot ID, and only lasts for the current app run
+- `--mascot/-m` supports template management:
+  - `--mascot list`
+  - `--mascot add ZIP`
+  - `--mascot remove MASCOT`
+- `--mascot/-m` does not require the main app to be running; it directly reads and writes the local template directory
+- `--stop` closes all mascots and stops the NeurolingsCE runtime; if no runtime is running, it does not start one just to stop it
+- Legacy commands remain supported: `list`, `list-loaded`, `spawn`, `alter`, `dismiss`, `dismiss-all`
 - `--json` emits stable structured success payloads and error objects
+- `--host` and `--port` are no longer supported; the CLI no longer uses HTTP
+- On Windows, call `NeurolingsCE-cli.exe` so shells and agents can reliably read exit codes
 
-See [src/docs/HTTP-API.md](src/docs/HTTP-API.md) for command syntax and the
-shared HTTP/CLI contract.
+See [src/docs/HTTP-API.md](src/docs/HTTP-API.md) for command syntax.
 
 ## Project Structure
 

@@ -33,6 +33,7 @@ Returns a list of mascots that are on the screen.
             },
             "data_id": 0,
             "id": 35,
+            "label": 0,
             "name": "Default Mascot"
         },
         {
@@ -245,19 +246,42 @@ Returns the preview image for a loaded mascot.
 
 ## CLI
 
-The main executable also exposes a CLI for automation against a running
-NeurolingsCE instance.
+NeurolingsCE also ships a dedicated console CLI binary, `NeurolingsCE-cli`,
+for automation against a running instance.
 
 **Global options:**
 
 - `--quiet`
 - `--json`
-- `--host <host>`
-- `--port <port>`
 - `--connect-timeout-ms <ms>`
 - `--read-timeout-ms <ms>`
 
-**Commands:**
+**Document commands:**
+
+- `--help`, `-h`
+- `--summon`, `-s`
+- `--close`
+- `--close-all`
+- `--stop`
+- `--mascot`, `-m`
+- `--list`, `-l`
+- `--version`, `-v`
+
+**Document command forms:**
+
+- `--summon mascot --name NAME [label]`
+- `--summon mascot --data-id ID [label]`
+- `--summon random [label]`
+- `--close LABEL`
+- `--close-all`
+- `--stop`
+- `--mascot list`
+- `--mascot add ZIP`
+- `--mascot remove MASCOT`
+- `--list`
+- `--version`
+
+**Legacy commands still supported:**
 
 - `list`
 - `list-loaded`
@@ -266,5 +290,19 @@ NeurolingsCE instance.
 - `dismiss`
 - `dismiss-all`
 
-`--json` emits stable machine-readable output on success and failure. The CLI
-connects to an already running instance; it does not start one for you.
+**Notes:**
+
+- `label` is a user-facing CLI label and is separate from the runtime mascot ID.
+- Labels only live for the current NeurolingsCE process and are cleared on restart.
+- `GET /mascots` may include a `label` field when a mascot has been assigned a CLI label.
+- `--mascot list`, `--mascot add ZIP`, and `--mascot remove MASCOT` run standalone
+  and directly manage the local template directory.
+- `--stop` closes all mascots and stops the NeurolingsCE runtime. It is
+  idempotent and does not auto-start the runtime if it is already stopped.
+- Runtime control commands auto-start NeurolingsCE when no local runtime is ready,
+  then use local IPC, not HTTP, to talk to it.
+- `--host` and `--port` are no longer supported.
+- On Windows, prefer `NeurolingsCE-cli.exe` so command shells can observe exit codes correctly.
+
+`--json` emits stable machine-readable output on success and failure. Runtime
+control commands will start the local runtime automatically when needed.
