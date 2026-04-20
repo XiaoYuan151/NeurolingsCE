@@ -133,6 +133,26 @@ auto-start the NeurolingsCE runtime when needed, then talk to it over local IPC.
 
 See [src/docs/HTTP-API.md](src/docs/HTTP-API.md) for command syntax.
 
+## NeurolingsCE-Skill
+
+The repository also includes a companion skill at `neurolingsce-skill/`. It teaches agents to control already-installed mascot templates through `NeurolingsCE-cli.exe`.
+
+- Skill display name: `NeurolingsCE-Skill`
+- Machine name: `neurolingsce-skill`
+- Default behavior: call `NeurolingsCE-cli.exe` only; unless the user explicitly asks for it, do not start `NeurolingsCE.exe`, do not open the GUI, and do not start runtime mode
+- Semantic rule: when a user says "generate a xxx mascot/desktop pet", interpret that as summoning an **installed template**, not generating mascot assets, images, sprites, XML, or ZIP packs
+- If the requested template is missing, the agent should say that the template is not installed or not found, rather than creating a new mascot or substituting a different one
+
+Helper scripts:
+
+```powershell
+python neurolingsce-skill/scripts/find_neurolingsce_cli.py
+python neurolingsce-skill/scripts/summon_companion.py
+```
+
+- `find_neurolingsce_cli.py`: searches explicit paths, common build outputs, `PATH`, and common install locations for `NeurolingsCE-cli.exe`, then records the result in `neurolingsce-skill/cache/neurolingsce-cli-path.json`
+- `summon_companion.py`: summons one random **non-default** installed mascot; if only the default template exists, it reports that no non-default template is available and does not create resources
+
 ## Project Structure
 
 ```

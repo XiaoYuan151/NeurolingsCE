@@ -132,6 +132,26 @@ CONFIG=release make -j$(nproc)
 
 详细命令格式见 [src/docs/HTTP-API.md](src/docs/HTTP-API.md) 中的 CLI 部分。
 
+## NeurolingsCE-Skill
+
+仓库内提供了一个配套 skill：`neurolingsce-skill/`，用于指导 agent 通过 `NeurolingsCE-cli.exe` 控制已安装的桌宠模板。
+
+- skill 名称：`NeurolingsCE-Skill`
+- 机器名：`neurolingsce-skill`
+- 默认行为：只调用 `NeurolingsCE-cli.exe`；除非用户明确要求，否则不启动 `NeurolingsCE.exe`、不打开 GUI、也不启动 runtime mode
+- 语义约定：当用户说“帮我生成一只 xxx 桌宠”时，含义是 `summon` 一个**已安装模板**，不是生成桌宠资源、图片、sprites、XML 或 ZIP
+- 如果没有找到对应模板，agent 应直接提示“没有这个模板 / 模板未安装”，而不是自行创建或替换成别的桌宠
+
+常用辅助脚本：
+
+```powershell
+python neurolingsce-skill/scripts/find_neurolingsce_cli.py
+python neurolingsce-skill/scripts/summon_companion.py
+```
+
+- `find_neurolingsce_cli.py`：在显式路径、常见构建目录、`PATH` 和常见安装位置中搜索 `NeurolingsCE-cli.exe`，并记录到 `neurolingsce-skill/cache/neurolingsce-cli-path.json`
+- `summon_companion.py`：随机召唤一只**非默认**已安装桌宠；如果只有默认模板，则只返回“没有可用的非默认模板”，不会创建资源
+
 ## 项目结构
 
 ```
