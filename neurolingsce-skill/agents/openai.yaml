@@ -1,0 +1,4 @@
+interface:
+  display_name: "NeurolingsCE-Skill"
+  short_description: "Control NeurolingsCE desktop mascots"
+  default_prompt: "Use $neurolingsce-skill to summon a comforting non-default NeurolingsCE mascot."
