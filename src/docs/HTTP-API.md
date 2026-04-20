@@ -2,6 +2,20 @@
 
 Base URL: http://127.0.0.1:32456/shijima/api/v1
 
+## GET /ping
+
+Returns API readiness metadata.
+
+**Sample response:**
+
+```json
+{
+    "ok": true,
+    "app": "NeurolingsCE",
+    "api_version": "v1"
+}
+```
+
 ## GET /mascots
 
 Returns a list of mascots that are on the screen.
@@ -87,6 +101,14 @@ Spawns a new mascot. One of `name` or `data_id` must be specified.
 
 Dismisses all mascots.
 
+**Request format (optional):**
+
+```json
+{
+    "selector": "string"
+}
+```
+
 ## GET /mascots/:id
 
 Gets data for one mascot.
@@ -105,6 +127,17 @@ Gets data for one mascot.
         "id": 35,
         "name": "Default Mascot"
     }
+}
+```
+
+**404 response:**
+
+```json
+{
+    "error": "No such mascot",
+    "code": "mascot_not_found",
+    "status": 404,
+    "mascot": null
 }
 ```
 
@@ -195,6 +228,43 @@ Returns information about a specific loaded mascot.
 }
 ```
 
+**404 response:**
+
+```json
+{
+    "error": "No such loaded mascot",
+    "code": "loaded_mascot_not_found",
+    "status": 404,
+    "loaded_mascot": null
+}
+```
+
 ## GET /loadedMascots/:id/preview.png
 
 Returns the preview image for a loaded mascot.
+
+## CLI
+
+The main executable also exposes a CLI for automation against a running
+NeurolingsCE instance.
+
+**Global options:**
+
+- `--quiet`
+- `--json`
+- `--host <host>`
+- `--port <port>`
+- `--connect-timeout-ms <ms>`
+- `--read-timeout-ms <ms>`
+
+**Commands:**
+
+- `list`
+- `list-loaded`
+- `spawn`
+- `alter`
+- `dismiss`
+- `dismiss-all`
+
+`--json` emits stable machine-readable output on success and failure. The CLI
+connects to an already running instance; it does not start one for you.

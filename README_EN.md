@@ -105,6 +105,18 @@ A built-in HTTP REST API runs at `http://127.0.0.1:32456`, allowing external pro
 
 See detailed documentation at [src/docs/HTTP-API.md](src/docs/HTTP-API.md).
 
+## CLI
+
+The main executable also provides a script/agent-friendly CLI that talks to an
+already running instance on `127.0.0.1:32456` by default.
+
+- Global options: `--quiet`, `--json`, `--host`, `--port`, `--connect-timeout-ms`, `--read-timeout-ms`
+- Commands: `list`, `list-loaded`, `spawn`, `alter`, `dismiss`, `dismiss-all`
+- `--json` emits stable structured success payloads and error objects
+
+See [src/docs/HTTP-API.md](src/docs/HTTP-API.md) for command syntax and the
+shared HTTP/CLI contract.
+
 ## Project Structure
 
 ```

@@ -20,80 +20,40 @@
 #include "shijima-qt/AppLog.hpp"
 #include <httplib.h>
 #include "shijima-qt/ShijimaManager.hpp"
-#include "shijima-qt/MascotData.hpp"
-#include "shijima-qt/ui/mascot/ShijimaWidget.hpp"
 #include <sstream>
 #include <thread>
 #include <QJsonArray>
 #include <QJsonDocument>
-#include <QBuffer>
 #include <QJsonObject>
-#include <QPixmap>
+#include <QString>
+
+#include <algorithm>
+#include <cctype>
 
 using namespace httplib;
 
-static QJsonObject vecToObject(shijima::math::vec2 vec) {
-    QJsonObject obj;
-    obj["x"] = vec.x;
-    obj["y"] = vec.y;
-    return obj;
-}
+namespace {
 
-static QJsonObject mascotToObject(ShijimaWidget *widget) {
-    QJsonObject obj;
-    obj["id"] = widget->mascotId();
-    obj["data_id"] = widget->mascotData()->id();
-    obj["name"] = widget->mascotData()->name();
-    obj["anchor"] = vecToObject(widget->mascot().state->anchor);
-    auto activeBehavior = widget->mascot().active_behavior();
-    if (activeBehavior != nullptr) {
-        obj["active_behavior"] = QString::fromStdString(activeBehavior->name);
+bool requestHasJsonContentType(Request const& req) {
+    auto contentType = req.get_header_value("content-type");
+    std::transform(contentType.begin(), contentType.end(), contentType.begin(),
+        [](unsigned char ch) {
+            return static_cast<char>(std::tolower(ch));
+        });
+    auto separator = contentType.find(';');
+    if (separator != std::string::npos) {
+        contentType.resize(separator);
     }
-    else {
-        obj["active_behavior"] = QJsonValue {};
-    }
-    return obj;
-}
-
-static QJsonObject mascotDataToObject(MascotData *data) {
-    QJsonObject obj;
-    obj["id"] = data->id();
-    obj["name"] = data->name();
-    return obj;
-}
-
-static shijima::math::vec2 valueToVec(QJsonValue const& value) {
-    shijima::math::vec2 vec { NAN, NAN };
-    if (value.isObject()) {
-        auto object = value.toObject();
-        auto xValue = object.take("x");
-        auto yValue = object.take("y");
-        if (xValue.isDouble() && yValue.isDouble()) {
-            vec.x = xValue.toDouble();
-            vec.y = yValue.toDouble();
-        }
-    }
-    return vec;
-}
-
-static void applyObjectToWidget(QJsonObject &object, ShijimaWidget *widget) {
-    if (auto anchor = valueToVec(object.take("anchor"));
-        !std::isnan(anchor.x))
+    while (!contentType.empty() &&
+        std::isspace(static_cast<unsigned char>(contentType.back())))
     {
-        widget->mascot().state->anchor = anchor;
+        contentType.pop_back();
     }
-    if (auto value = object.take("behavior"); value.isString()) {
-        auto str = value.toString().toStdString();
-        auto behavior = widget->mascot()
-            .initial_behavior_list().find(str, false);
-        if (behavior != nullptr) {
-            widget->mascot().next_behavior(str);
-        }
-    }
+    return contentType == "application/json";
 }
 
-static std::optional<QJsonObject> jsonForRequest(Request const& req) {
-    if (req.get_header_value("content-type") != "application/json") {
+std::optional<QJsonObject> jsonForRequest(Request const& req) {
+    if (!requestHasJsonContentType(req)) {
         return {};
     }
     QByteArray bytes { req.body.c_str(), (qsizetype)req.body.size() };
@@ -113,37 +73,56 @@ static std::optional<QJsonObject> jsonForRequest(Request const& req) {
     }
 }
 
-static void sendJson(Response &res, QJsonObject const& object) {
+MascotPatch patchFromJson(QJsonObject object) {
+    MascotPatch patch;
+    auto anchorValue = object.take("anchor");
+    if (anchorValue.isObject()) {
+        auto anchorObject = anchorValue.toObject();
+        auto xValue = anchorObject.value("x");
+        auto yValue = anchorObject.value("y");
+        if (xValue.isDouble()) {
+            patch.anchorX = xValue.toDouble();
+        }
+        if (yValue.isDouble()) {
+            patch.anchorY = yValue.toDouble();
+        }
+    }
+    auto behaviorValue = object.take("behavior");
+    if (behaviorValue.isString()) {
+        patch.behavior = behaviorValue.toString();
+    }
+    return patch;
+}
+
+SpawnMascotRequest spawnRequestFromJson(QJsonObject object) {
+    SpawnMascotRequest request;
+    auto nameValue = object.take("name");
+    if (nameValue.isString()) {
+        request.name = nameValue.toString();
+    }
+    auto dataIdValue = object.take("data_id");
+    if (dataIdValue.isDouble()) {
+        request.dataId = dataIdValue.toInt();
+    }
+    request.patch = patchFromJson(object);
+    return request;
+}
+
+void sendJson(Response &res, QJsonObject const& object) {
     QJsonDocument doc { object };
     auto bytes = doc.toJson(QJsonDocument::Compact);
     res.set_content(&bytes[0], bytes.size(), "application/json");
 }
 
-static void badRequest(Request const&, Response &res) {
+void badRequest(Request const&, Response &res) {
     QJsonObject obj;
     obj["error"] = "400 Bad Request";
+    obj["code"] = "bad_request";
     res.status = 400;
     sendJson(res, obj);
 }
 
-static bool selectorEval(ShijimaWidget *mascot, std::string const& selector) {
-    if (selector.empty()) {
-        return true;
-    }
-    bool eval;
-    try {
-        mascot->mascot().script_ctx->state = mascot->mascot().state;
-        eval = mascot->mascot().script_ctx->eval_bool(selector);
-    }
-    catch (std::exception &ex) {
-        APP_LOG_WARN("http") << "Selector evaluation failed for mascotId="
-            << mascot->mascotId() << ", selector=\"" << selector << "\": " << ex.what();
-        eval = false;
-    }
-    return eval;
-}
-
-static std::string requestTarget(Request const& req) {
+std::string requestTarget(Request const& req) {
     std::ostringstream target;
     target << req.path;
     for (auto it = req.params.begin(); it != req.params.end(); ++it) {
@@ -153,26 +132,32 @@ static std::string requestTarget(Request const& req) {
     return target.str();
 }
 
+void sendError(Response &res, MascotCommandStatus const& status) {
+    res.status = status.status;
+    sendJson(res, errorToJson(status));
+}
+
+}
+
 ShijimaHttpApi::ShijimaHttpApi(ShijimaManager *manager): m_server(new Server),
-    m_thread(nullptr), m_manager(manager), m_host(""), m_port(-1)
+    m_thread(nullptr), m_manager(manager), m_service(manager), m_host(""),
+    m_port(-1)
 {
-    m_server->Get("/shijima/api/v1/mascots",
-        [this](Request const& req, Response &res)
-    {
-        QJsonArray array;
-        std::string selector;
+    m_server->Get("/shijima/api/v1/mascots", [this](Request const& req, Response &res) {
+        ListMascotsRequest request;
         if (req.has_param("selector")) {
-            selector = req.get_param_value("selector");
+            request.selector = QString::fromStdString(req.get_param_value("selector"));
         }
-        m_manager->onTickSync([&array, &selector](ShijimaManager *manager){
-            auto &mascots = manager->mascots();
-            for (auto mascot : mascots) {
-                if (!selectorEval(mascot, selector)) {
-                    continue;
-                }
-                array.append(mascotToObject(mascot));
-            }
-        });
+        QList<MascotInfo> mascots;
+        auto status = m_service.listMascots(request, mascots);
+        if (!status.ok()) {
+            sendError(res, status);
+            return;
+        }
+        QJsonArray array;
+        for (auto const& mascot : mascots) {
+            array.append(mascotInfoToJson(mascot));
+        }
         QJsonObject object;
         object["mascots"] = array;
         sendJson(res, object);
@@ -185,42 +170,19 @@ ShijimaHttpApi::ShijimaHttpApi(ShijimaManager *manager): m_server(new Server),
             badRequest(req, res);
             return;
         }
-        auto nameValue = json->take("name");
-        auto dataIdValue = json->take("data_id");
-        int dataId = -1;
-        if (!nameValue.isUndefined() && !dataIdValue.isUndefined()) {
+        auto request = spawnRequestFromJson(*json);
+        if (request.name.has_value() && request.dataId.has_value()) {
             badRequest(req, res);
             return;
         }
-        if (dataIdValue.isDouble()) {
-            dataId = dataIdValue.toInt();
+        MascotInfo mascot;
+        auto status = m_service.spawnMascot(request, mascot);
+        if (!status.ok()) {
+            sendError(res, status);
+            return;
         }
         QJsonObject object;
-        m_manager->onTickSync([&dataId, &nameValue, &res, &object, &json]
-            (ShijimaManager *manager)
-        {
-            QString mascotName;
-            if (dataId == -1) {
-                auto name = nameValue.toString();
-                if (manager->loadedMascots().contains(name)) {
-                    mascotName = name;
-                }
-            }
-            else {
-                if (manager->loadedMascotsById().contains(dataId)) {
-                    mascotName = manager->loadedMascotsById()[dataId]->name();
-                }
-            }
-            if (mascotName.isEmpty()) {
-                res.status = 400;
-                object["error"] = "Invalid mascot name or data ID";
-            }
-            else {
-                auto widget = manager->spawn(mascotName.toStdString());
-                applyObjectToWidget(*json, widget);
-                object["mascot"] = mascotToObject(widget);
-            }
-        });
+        object["mascot"] = mascotInfoToJson(mascot);
         sendJson(res, object);
     });
     m_server->Put("/shijima/api/v1/mascots/([0-9]+)",
@@ -232,133 +194,115 @@ ShijimaHttpApi::ShijimaHttpApi(ShijimaManager *manager): m_server(new Server),
             return;
         }
         auto id = std::stoi(req.matches[1].str());
+        MascotInfo mascot;
+        auto status = m_service.alterMascot(id, patchFromJson(*json), mascot);
+        if (!status.ok()) {
+            QJsonObject object = errorToJson(status);
+            object["mascot"] = QJsonValue::Null;
+            res.status = status.status;
+            sendJson(res, object);
+            return;
+        }
         QJsonObject object;
-        m_manager->onTickSync([&json, &object, &res, id]
-            (ShijimaManager *manager)
-        {
-            if (manager->mascotsById().count(id) == 1) {
-                auto widget = manager->mascotsById().at(id);
-                applyObjectToWidget(*json, widget);
-                object["mascot"] = mascotToObject(widget);
-            }
-            else {
-                res.status = 404;
-                object["error"] = "No such mascot";
-            }
-        });
+        object["mascot"] = mascotInfoToJson(mascot);
         sendJson(res, object);
     });
     m_server->Get("/shijima/api/v1/mascots/([0-9]+)",
         [this](Request const& req, Response &res)
     {
         auto id = std::stoi(req.matches[1].str());
+        MascotInfo mascot;
+        auto status = m_service.getMascot(id, mascot);
+        if (!status.ok()) {
+            QJsonObject object = errorToJson(status);
+            object["mascot"] = QJsonValue::Null;
+            res.status = status.status;
+            sendJson(res, object);
+            return;
+        }
         QJsonObject object;
-        m_manager->onTickSync([&object, &res, id](ShijimaManager *manager){
-            if (manager->mascotsById().count(id) == 1) {
-                object["mascot"] = mascotToObject(manager->mascotsById().at(id));
-            }
-            else {
-                res.status = 404;
-                object["mascot"] = QJsonValue {};
-            }
-        });
+        object["mascot"] = mascotInfoToJson(mascot);
         sendJson(res, object);
     });
     m_server->Delete("/shijima/api/v1/mascots/([0-9]+)",
         [this](Request const& req, Response &res)
     {
         auto id = std::stoi(req.matches[1].str());
-        QJsonObject object;
-        m_manager->onTickSync([&object, &res, id](ShijimaManager *manager){
-            if (manager->mascotsById().count(id) == 1) {
-                auto mascot = manager->mascotsById().at(id);
-                mascot->markForDeletion();
-            }
-            else {
-                res.status = 404;
-                object["error"] = "404 Not Found";
-            }
-        });
-        sendJson(res, object);
+        auto status = m_service.dismissMascot(id);
+        if (!status.ok()) {
+            sendError(res, status);
+            return;
+        }
+        sendJson(res, {});
     });
     m_server->Delete("/shijima/api/v1/mascots",
         [this](Request const& req, Response &res)
     {
         auto json = jsonForRequest(req);
-        std::string selector;
+        DismissAllMascotsRequest request;
         if (json.has_value() && json->contains("selector")) {
             auto value = json->take("selector");
             if (value.isString()) {
-                selector = value.toString().toStdString();
+                request.selector = value.toString();
             }
         }
-        m_manager->onTickSync([&selector](ShijimaManager *manager){
-            auto &mascots = manager->mascots();
-            for (auto mascot : mascots) {
-                if (!selectorEval(mascot, selector)) {
-                    continue;
-                }
-                mascot->markForDeletion();
-            }
-        });
+        auto status = m_service.dismissAllMascots(request);
+        if (!status.ok()) {
+            sendError(res, status);
+            return;
+        }
         sendJson(res, {});
     });
     m_server->Get("/shijima/api/v1/loadedMascots",
         [this](Request const&, Response &res)
     {
+        QList<LoadedMascotInfo> mascots;
+        auto status = m_service.listLoadedMascots(mascots);
+        if (!status.ok()) {
+            sendError(res, status);
+            return;
+        }
         QJsonArray array;
-        m_manager->onTickSync([&array](ShijimaManager *manager){
-            auto &mascots = manager->loadedMascots();
-            for (auto mascot : mascots) {
-                array.append(mascotDataToObject(mascot));
-            }
-        });
+        for (auto const& mascot : mascots) {
+            array.append(loadedMascotInfoToJson(mascot));
+        }
         QJsonObject object;
         object["loaded_mascots"] = array;
         sendJson(res, object);
     });
     m_server->Get("/shijima/api/v1/ping",
-        [](Request const&, Response &res)
+        [this](Request const&, Response &res)
     {
-        sendJson(res, {});
+        sendJson(res, pingInfoToJson(m_service.ping()));
     });
     m_server->Get("/shijima/api/v1/loadedMascots/([0-9]+)",
         [this](Request const& req, Response &res)
     {
         auto id = std::stoi(req.matches[1].str());
+        LoadedMascotInfo mascot;
+        auto status = m_service.getLoadedMascot(id, mascot);
+        if (!status.ok()) {
+            QJsonObject object = errorToJson(status);
+            object["loaded_mascot"] = QJsonValue::Null;
+            res.status = status.status;
+            sendJson(res, object);
+            return;
+        }
         QJsonObject object;
-        m_manager->onTickSync([&object, &res, id](ShijimaManager *manager){
-            if (manager->loadedMascotsById().contains(id)) {
-                object["loaded_mascot"] = mascotDataToObject(manager->loadedMascotsById()[id]);
-            }
-            else {
-                res.status = 404;
-                object["loaded_mascot"] = QJsonValue {};
-            }
-        });
+        object["loaded_mascot"] = loadedMascotInfoToJson(mascot);
         sendJson(res, object);
     });
     m_server->Get("/shijima/api/v1/loadedMascots/([0-9]+)/preview.png",
         [this](Request const& req, Response &res)
     {
         auto id = std::stoi(req.matches[1].str());
-        m_manager->onTickSync([&res, id](ShijimaManager *manager){
-            if (manager->loadedMascotsById().contains(id)) {
-                auto data = manager->loadedMascotsById()[id];
-                auto &preview = data->preview();
-                auto pixmap = preview.pixmap(preview.availableSizes()[0]);
-                QByteArray bytes {};
-                QBuffer buf { &bytes };
-                buf.open(QBuffer::WriteOnly);
-                pixmap.save(&buf, "PNG");
-                buf.close();
-                res.set_content(&bytes[0], bytes.size(), "image/png");
-            }
-            else {
-                res.status = 404;
-                res.set_content("404 Not Found", "text/plain");
-            }
-        });
+        QByteArray bytes;
+        auto status = m_service.getLoadedMascotPreviewPng(id, bytes);
+        if (!status.ok()) {
+            sendError(res, status);
+            return;
+        }
+        res.set_content(bytes.constData(), bytes.size(), "image/png");
     });
     m_server->Get(".*", badRequest);
     m_server->Put(".*", badRequest);

@@ -105,6 +105,17 @@ CONFIG=release make -j$(nproc)
 
 详细文档见 [src/docs/HTTP-API.md](src/docs/HTTP-API.md)。
 
+## CLI
+
+主程序同时提供面向脚本/agent 的 CLI，默认连接到已运行实例的
+`127.0.0.1:32456`。
+
+- 全局选项：`--quiet`、`--json`、`--host`、`--port`、`--connect-timeout-ms`、`--read-timeout-ms`
+- 命令：`list`、`list-loaded`、`spawn`、`alter`、`dismiss`、`dismiss-all`
+- `--json` 会输出稳定的结构化结果与错误对象
+
+详细命令格式与 HTTP API 约定见 [src/docs/HTTP-API.md](src/docs/HTTP-API.md)。
+
 ## 项目结构
 
 ```

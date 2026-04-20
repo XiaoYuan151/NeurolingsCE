@@ -74,7 +74,7 @@ void appTerminateHandler() {
 }
 
 int main(int argc, char **argv) {
-    if (argc > 1) {
+    if (shijimaShouldRunCli(argc, argv)) {
         QCoreApplication app(argc, argv);
         app.setApplicationName(QStringLiteral(APP_NAME));
         AppLog::initialize(&app);

@@ -168,6 +168,8 @@ target_sources(NeurolingsCE PRIVATE
   src/app/core/assets/Asset.cc
   src/app/core/assets/MascotData.cc
   src/app/core/assets/AssetLoader.cc
+  src/app/core/commands/MascotApi.cc
+  src/app/core/commands/MascotCommandService.cc
   src/app/ui/menus/ShijimaContextMenu.cc
   src/app/ui/menus/ContextMenuActions.cc
   src/app/core/audio/SoundEffectManager.cc
@@ -191,6 +193,9 @@ target_sources(NeurolingsCE PRIVATE
   src/app/ui/interface/ManagerNavigation.cc
   src/app/ui/interface/ManagerSettingsPage.cc
   src/app/cli.cc
+  src/app/cli/CommandLineParser.cc
+  src/app/cli/CommandExecutor.cc
+  src/app/cli/OutputFormatter.cc
   src/app/ui/widgets/SpeechBubbleWidget.cc
   src/app/ui/widgets/SpeechBubbleTextCatalog.cc
   src/resources/resources.qrc

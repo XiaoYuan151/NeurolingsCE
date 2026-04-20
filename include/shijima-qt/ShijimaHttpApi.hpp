@@ -18,6 +18,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 // 
 
+#include "shijima-qt/MascotCommandService.hpp"
 #include <string>
 #include <thread>
 
@@ -32,6 +33,7 @@ private:
     httplib::Server *m_server;
     std::thread *m_thread;
     ShijimaManager *m_manager;
+    MascotCommandService m_service;
     std::string m_host;
     int m_port;
 public:
