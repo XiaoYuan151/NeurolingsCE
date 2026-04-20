@@ -25,6 +25,30 @@ def repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+def skill_root() -> Path:
+    return Path(__file__).resolve().parents[1]
+
+
+def default_record_path() -> Path:
+    return skill_root() / "cache" / "neurolingsce-cli-path.json"
+
+
+def recorded_cli_path(record_path: Path) -> Path | None:
+    if not record_path.is_file():
+        return None
+    try:
+        payload = json.loads(record_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    cli = payload.get("cli")
+    if not isinstance(cli, str) or not cli:
+        return None
+    path = Path(cli)
+    return path if path.is_file() else None
+
+
 def candidate_cli_paths(explicit: str | None) -> list[Path]:
     candidates: list[Path] = []
     if explicit:
@@ -50,7 +74,10 @@ def candidate_cli_paths(explicit: str | None) -> list[Path]:
     return candidates
 
 
-def find_cli(explicit: str | None) -> Path | None:
+def find_cli(explicit: str | None, record_path: Path) -> Path | None:
+    recorded = recorded_cli_path(record_path)
+    if recorded is not None:
+        return recorded
     for candidate in candidate_cli_paths(explicit):
         if candidate.is_file():
             return candidate
@@ -121,19 +148,26 @@ def main(argv: list[str]) -> int:
     )
     parser.add_argument("--cli", help="Path to NeurolingsCE-cli.exe.")
     parser.add_argument(
+        "--record",
+        default=str(default_record_path()),
+        help="JSON record produced by find_neurolingsce_cli.py.",
+    )
+    parser.add_argument(
         "--label",
         help="Optional user-facing CLI label to pass to --summon.",
     )
     args = parser.parse_args(argv)
 
-    cli = find_cli(args.cli)
+    record_path = Path(args.record).expanduser()
+    cli = find_cli(args.cli, record_path)
     if cli is None:
         searched = [str(path) for path in candidate_cli_paths(args.cli)]
         return write_json(
             {
                 "ok": False,
                 "code": "cli_not_found",
-                "message": "Could not find NeurolingsCE-cli.exe after searching explicit, repo build, and PATH locations. Install or build NeurolingsCE, or pass --cli PATH.",
+                "message": "Could not find NeurolingsCE-cli.exe after checking the recorded path, explicit path, repo build locations, and PATH. Run find_neurolingsce_cli.py, install/build NeurolingsCE, or pass --cli PATH.",
+                "record": str(record_path),
                 "searched": searched,
             },
             127,
@@ -166,7 +200,7 @@ def main(argv: list[str]) -> int:
             {
                 "ok": False,
                 "code": "no_non_default_mascots",
-                "message": "Only Default Mascot is available. Import another mascot with: NeurolingsCE-cli.exe --json --mascot add ZIP",
+                "message": "No non-default mascot template is installed. Nothing was summoned.",
                 "cli": str(cli),
             },
             2,

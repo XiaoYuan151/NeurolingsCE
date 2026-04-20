@@ -1,6 +1,6 @@
 ---
 name: neurolingsce-skill
-description: Use NeurolingsCE-Skill to control NeurolingsCE desktop mascots through NeurolingsCE-cli, list/import/remove mascot templates, summon or close mascots, and provide proactive companionship. Trigger this skill for explicit NeurolingsCE-Skill, neurolingsce-skill, NeurolingsCE, NeurolingsCE-cli, desktop mascot, shimeji, 看板娘, 桌宠, mascot control, template management, or CLI automation requests, and when a user expresses low mood or asks for company, such as 情绪低落, 难过, 孤独, 需要陪伴, 陪我一下, emo, sad, lonely, down, depressed, or need company.
+description: Use NeurolingsCE-Skill only to control or summon existing NeurolingsCE desktop mascot templates through NeurolingsCE-cli; never create, draw, generate, import, or modify mascot resources. Trigger this skill for explicit NeurolingsCE-Skill, neurolingsce-skill, NeurolingsCE, NeurolingsCE-cli, desktop mascot, shimeji, 看板娘, 桌宠, mascot control, template listing, close/summon requests, CLI automation requests, or Chinese requests like 帮我生成一只xxx桌宠, where 生成 means summon an existing mascot with NeurolingsCE-cli, not create mascot art/assets. Also trigger when a user expresses low mood or asks for company, such as 情绪低落, 难过, 孤独, 需要陪伴, 陪我一下, emo, sad, lonely, down, depressed, or need company.
 ---
 
 # NeurolingsCE-Skill
@@ -11,14 +11,25 @@ Use `NeurolingsCE-cli.exe` on Windows so shells and agents can read exit codes r
 
 Runtime control commands auto-start NeurolingsCE when no local runtime is ready, then talk over local IPC. Do not use `--host` or `--port`; they are no longer supported.
 
-Before asking the user to install anything, search for `NeurolingsCE-cli.exe` first. Check an explicit path from the user, common repo build outputs such as `build-cli-check\bin`, `out\build\x64-Release\bin`, `out\build\x64-Debug\bin`, `build\bin`, and `build-release\bin`, then `PATH` with `where.exe NeurolingsCE-cli.exe` on Windows. Only if no CLI is found, tell the user to install or build NeurolingsCE.
+Before asking the user to install anything, search for `NeurolingsCE-cli.exe` first. Use the finder helper to check an explicit path, common repo build outputs, `PATH`, and common install roots, then record the discovered path for later calls:
+
+```powershell
+python neurolingsce-skill/scripts/find_neurolingsce_cli.py
+```
+
+Pass extra hints when needed:
+
+```powershell
+python neurolingsce-skill/scripts/find_neurolingsce_cli.py --cli C:\path\to\NeurolingsCE-cli.exe
+python neurolingsce-skill/scripts/find_neurolingsce_cli.py --search-root D:\Apps
+```
+
+The finder writes `neurolingsce-skill/cache/neurolingsce-cli-path.json`. If no CLI is found after this search, tell the user to install or build NeurolingsCE. Do not create mascot resources.
 
 Common commands:
 
 ```powershell
 NeurolingsCE-cli.exe --json --mascot list
-NeurolingsCE-cli.exe --json --mascot add ZIP
-NeurolingsCE-cli.exe --json --mascot remove MASCOT
 NeurolingsCE-cli.exe --json --summon mascot --name NAME
 NeurolingsCE-cli.exe --json --summon mascot --data-id ID
 NeurolingsCE-cli.exe --json --list
@@ -28,6 +39,16 @@ NeurolingsCE-cli.exe --json --stop
 ```
 
 Use `--summon random` only when the user explicitly wants any loaded mascot. For companionship, do not use it because it may choose `Default Mascot`.
+
+## Request Semantics
+
+Interpret requests like `帮我生成一只xxx桌宠`, `生成一个xxx桌宠`, or `来一只xxx桌宠` as requests to summon an existing mascot template with `NeurolingsCE-cli.exe --json --summon mascot --name NAME` or `--data-id ID`.
+
+Do not treat these phrases as requests to create new mascot resources, draw character art, generate sprites, build a Shimeji pack, or import assets unless the user explicitly asks for new resources, images, sprites, XML, ZIP packs, or asset creation.
+
+If `xxx` names a mascot, first list templates with `NeurolingsCE-cli.exe --json --mascot list`, match the requested name against available templates, then summon the matched template. If no match exists, tell the user exactly that this template is not installed or not found. Do not create assets, generate images, generate sprites, build XML, build ZIP packs, import a replacement, or choose a different mascot unless the user asks for a different installed template.
+
+This skill does not generate anything. Treat "生成桌宠" as wording for "summon an installed mascot"; if the installed template does not exist, stop after telling the user it does not exist.
 
 ## Companionship Trigger
 
@@ -47,18 +68,14 @@ python neurolingsce-skill/scripts/summon_companion.py --cli .\build-cli-check\bi
 
 The helper:
 
-- Searches for `NeurolingsCE-cli.exe` from `--cli`, common repo build outputs, and `PATH`.
+- Reads `cache/neurolingsce-cli-path.json` when available, then searches for `NeurolingsCE-cli.exe` from `--cli`, common repo build outputs, and `PATH`.
 - Runs `--json --mascot list`.
 - Filters out `id == 0` and `name == "Default Mascot"`.
 - Randomly chooses one remaining template.
 - Summons it with `--json --summon mascot --name NAME`.
 - Emits JSON describing success or the reason no mascot was summoned.
 
-If no non-default mascot is available, tell the user that only the default mascot is installed and suggest importing one:
-
-```powershell
-NeurolingsCE-cli.exe --json --mascot add ZIP
-```
+If no non-default mascot is available, tell the user that no non-default mascot template is installed. Do not create, download, import, or suggest a substitute mascot.
 
 ## Output Handling
 
