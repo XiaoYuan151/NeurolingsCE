@@ -3,9 +3,9 @@
 # Update this file to change version and application names across all build systems.
 
 # Version Information
-VERSION=0.2.0
+VERSION=0.3.0
 VERSION_MAJOR=0
-VERSION_MINOR=2
+VERSION_MINOR=3
 VERSION_PATCH=0
 
 # Human-readable version name (optional)

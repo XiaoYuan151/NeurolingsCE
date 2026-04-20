@@ -31,7 +31,7 @@
 #endif
 
 #ifndef NEUROLINGSCE_VERSION
-#define NEUROLINGSCE_VERSION "0.2.0"
+#define NEUROLINGSCE_VERSION "0.3.0"
 #endif
 
 namespace {
