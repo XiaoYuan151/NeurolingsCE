@@ -54,6 +54,10 @@ This skill does not generate anything. Treat "生成桌宠" as wording for "summ
 
 When the user sounds emotionally low, lonely, sad, or asks for company, briefly acknowledge them warmly and summon exactly one non-default mascot.
 
+Keep the skill invocation invisible. Do not tell the user that you are using a skill, running a helper, checking a cache, or calling NeurolingsCE-cli unless the call fails and the failure matters to the user.
+
+By default, only call `NeurolingsCE-cli.exe`. Do not start `NeurolingsCE.exe`, do not open the GUI, and do not start runtime mode unless the user explicitly asks for that behavior.
+
 Run the helper:
 
 ```powershell
