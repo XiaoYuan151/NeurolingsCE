@@ -46,11 +46,11 @@ def common_candidates(explicit: str | None) -> list[Path]:
 
     root = repo_root()
     for relative in (
-        ("build-cli-check", "bin"),
         ("out", "build", "x64-Release", "bin"),
         ("out", "build", "x64-Debug", "bin"),
         ("build", "bin"),
         ("build-release", "bin"),
+        ("build-cli-check", "bin"),
         ("publish", "Windows", "release"),
         ("publish", "Windows", "debug"),
     ):
@@ -96,10 +96,36 @@ def recursive_candidates(roots: list[Path], max_depth: int) -> list[Path]:
     return candidates
 
 
+def current_contract_ok(details: dict[str, Any]) -> bool:
+    payload = details.get("help_payload")
+    if not isinstance(payload, dict):
+        return False
+    commands = payload.get("commands")
+    if not isinstance(commands, list):
+        return False
+    names = {
+        item.get("name")
+        for item in commands
+        if isinstance(item, dict) and isinstance(item.get("name"), str)
+    }
+    required = {"--summon", "--mascot", "--list", "--stop"}
+    return required.issubset(names)
+
+
 def runnable_version(path: Path) -> tuple[bool, dict[str, Any]]:
     try:
-        completed = subprocess.run(
+        version_completed = subprocess.run(
             [str(path), "--json", "--version"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+            timeout=10,
+        )
+        help_completed = subprocess.run(
+            [str(path), "--json", "--help"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
@@ -111,22 +137,34 @@ def runnable_version(path: Path) -> tuple[bool, dict[str, Any]]:
     except OSError as exc:
         return False, {"error": str(exc)}
     except subprocess.TimeoutExpired:
-        return False, {"error": "Version check timed out."}
+        return False, {"error": "CLI capability check timed out."}
 
     details: dict[str, Any] = {
-        "exit_code": completed.returncode,
-        "stdout": completed.stdout.strip(),
-        "stderr": completed.stderr.strip(),
+        "version_exit_code": version_completed.returncode,
+        "version_stdout": version_completed.stdout.strip(),
+        "version_stderr": version_completed.stderr.strip(),
+        "help_exit_code": help_completed.returncode,
+        "help_stdout": help_completed.stdout.strip(),
+        "help_stderr": help_completed.stderr.strip(),
     }
-    if completed.returncode != 0:
+    if version_completed.returncode != 0 or help_completed.returncode != 0:
         return False, details
     try:
-        parsed = json.loads(details["stdout"])
+        parsed = json.loads(details["version_stdout"])
     except json.JSONDecodeError:
         parsed = None
     if isinstance(parsed, dict):
         details["version_payload"] = parsed
-    return True, details
+    try:
+        parsed = json.loads(details["help_stdout"])
+    except json.JSONDecodeError:
+        parsed = None
+    if isinstance(parsed, dict):
+        details["help_payload"] = parsed
+    ok = current_contract_ok(details)
+    if not ok:
+        details["error"] = "CLI is runnable but does not support the current command contract."
+    return ok, details
 
 
 def find_cli(explicit: str | None, extra_roots: list[str], max_depth: int) -> tuple[Path | None, list[dict[str, Any]]]:

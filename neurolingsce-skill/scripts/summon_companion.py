@@ -57,11 +57,11 @@ def candidate_cli_paths(explicit: str | None) -> list[Path]:
     root = repo_root()
     candidates.extend(
         [
-            root / "build-cli-check" / "bin" / "NeurolingsCE-cli.exe",
             root / "out" / "build" / "x64-Release" / "bin" / "NeurolingsCE-cli.exe",
             root / "out" / "build" / "x64-Debug" / "bin" / "NeurolingsCE-cli.exe",
             root / "build" / "bin" / "NeurolingsCE-cli.exe",
             root / "build-release" / "bin" / "NeurolingsCE-cli.exe",
+            root / "build-cli-check" / "bin" / "NeurolingsCE-cli.exe",
             root / "publish" / "Windows" / "release" / "NeurolingsCE-cli.exe",
             root / "publish" / "Windows" / "debug" / "NeurolingsCE-cli.exe",
         ]
@@ -74,14 +74,54 @@ def candidate_cli_paths(explicit: str | None) -> list[Path]:
     return candidates
 
 
-def find_cli(explicit: str | None, record_path: Path) -> Path | None:
+def parse_json_object(stdout: str) -> dict[str, Any] | None:
+    try:
+        payload = json.loads(stdout)
+    except json.JSONDecodeError:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def cli_supports_current_contract(cli: Path) -> bool:
+    code, stdout, _stderr = run_cli(cli, ["--json", "--help"])
+    if code != 0:
+        return False
+    payload = parse_json_object(stdout)
+    if payload is None:
+        return False
+    commands = payload.get("commands")
+    if not isinstance(commands, list):
+        return False
+    names = {
+        item.get("name")
+        for item in commands
+        if isinstance(item, dict) and isinstance(item.get("name"), str)
+    }
+    required = {"--summon", "--mascot", "--list", "--stop"}
+    return required.issubset(names)
+
+
+def find_cli(explicit: str | None, record_path: Path) -> tuple[Path | None, list[str]]:
+    rejected: list[str] = []
+
+    candidates: list[Path] = []
     recorded = recorded_cli_path(record_path)
     if recorded is not None:
-        return recorded
-    for candidate in candidate_cli_paths(explicit):
-        if candidate.is_file():
-            return candidate
-    return None
+        candidates.append(recorded)
+    candidates.extend(candidate_cli_paths(explicit))
+
+    seen: set[Path] = set()
+    for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        if not candidate.is_file():
+            continue
+        if not cli_supports_current_contract(candidate):
+            rejected.append(str(candidate))
+            continue
+        return candidate, rejected
+    return None, rejected
 
 
 def run_cli(cli: Path, args: list[str]) -> tuple[int, str, str]:
@@ -159,23 +199,24 @@ def main(argv: list[str]) -> int:
     args = parser.parse_args(argv)
 
     record_path = Path(args.record).expanduser()
-    cli = find_cli(args.cli, record_path)
+    cli, rejected = find_cli(args.cli, record_path)
     if cli is None:
         searched = [str(path) for path in candidate_cli_paths(args.cli)]
         return write_json(
             {
                 "ok": False,
                 "code": "cli_not_found",
-                "message": "Could not find NeurolingsCE-cli.exe after checking the recorded path, explicit path, repo build locations, and PATH. Run find_neurolingsce_cli.py, install/build NeurolingsCE, or pass --cli PATH.",
+                "message": "Could not find a current NeurolingsCE-cli.exe after checking the recorded path, explicit path, repo build locations, and PATH. Run find_neurolingsce_cli.py, rebuild NeurolingsCE, or pass --cli PATH.",
                 "record": str(record_path),
                 "searched": searched,
+                "rejected": rejected,
             },
             127,
         )
 
     code, stdout, stderr = run_cli(cli, ["--json", "--mascot", "list"])
+    payload, parse_error = parse_cli_json(stdout, "--mascot list")
     if code != 0:
-        payload, parse_error = parse_cli_json(stdout, "--mascot list")
         return write_json(
             {
                 "ok": False,
@@ -190,7 +231,6 @@ def main(argv: list[str]) -> int:
             code,
         )
 
-    payload, parse_error = parse_cli_json(stdout, "--mascot list")
     if parse_error is not None or payload is None:
         return write_json(parse_error or {}, 1)
 
