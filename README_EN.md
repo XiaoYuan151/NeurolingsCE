@@ -1,4 +1,4 @@
-# <img src="src/packaging/io.github.qingchenyouforcc.NeurolingsCE.png" alt="NeurolingsCE icon" width="64" /> NeurolingsCE
+# <img src="src/packaging/io.github.qingchenyouforcc.NeurolingsCE.png" alt="NeurolingsCE icon" width="55" /> NeurolingsCE
 
 **English | [中文](README.md)**
 
