@@ -1,10 +1,12 @@
-# NeurolingsCE
+# <img src="src/packaging/io.github.qingchenyouforcc.NeurolingsCE.png" alt="NeurolingsCE icon" width="64" /> NeurolingsCE
 
 **English | [中文](README.md)**
 
 A cross-platform desktop mascot (Shimeji) application, extensively modified from [Shijima-Qt](https://github.com/pixelomer/Shijima-Qt).
 
 Built with C++17 / Qt6, supporting Windows, Linux, and macOS.
+
+![NeurolingsCE screenshot](.images/Shijima-Qt-Main-Window.png)
 
 ## Features
 
