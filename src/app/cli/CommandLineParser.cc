@@ -22,7 +22,7 @@
 
 namespace {
 
-QSet<QString> const& cliCommands() {
+QSet<QString> const& legacyCommands() {
     static const QSet<QString> commands = {
         QStringLiteral("list"),
         QStringLiteral("list-loaded"),
@@ -34,8 +34,31 @@ QSet<QString> const& cliCommands() {
     return commands;
 }
 
-bool isCliCommand(QString const& token) {
-    return cliCommands().contains(token);
+QSet<QString> const& documentCommands() {
+    static const QSet<QString> commands = {
+        QStringLiteral("--help"),
+        QStringLiteral("-h"),
+        QStringLiteral("--summon"),
+        QStringLiteral("-s"),
+        QStringLiteral("--close"),
+        QStringLiteral("--close-all"),
+        QStringLiteral("--stop"),
+        QStringLiteral("--mascot"),
+        QStringLiteral("-m"),
+        QStringLiteral("--list"),
+        QStringLiteral("-l"),
+        QStringLiteral("--version"),
+        QStringLiteral("-v"),
+    };
+    return commands;
+}
+
+bool isLegacyCommand(QString const& token) {
+    return legacyCommands().contains(token);
+}
+
+bool isDocumentCommand(QString const& token) {
+    return documentCommands().contains(token);
 }
 
 bool isBooleanGlobal(QString const& token) {
@@ -49,55 +72,114 @@ bool isValuedGlobal(QString const& token) {
         token == QStringLiteral("--read-timeout-ms");
 }
 
-QString generalUsage(char const *argv0) {
+QString helpSynopsis(char const *argv0) {
     return QStringLiteral(
-        "Usage: %1 [--quiet] [--json] [--host HOST] [--port PORT] "
-        "[--connect-timeout-ms MS] [--read-timeout-ms MS] <command> [options...]")
+        "Usage: %1 [--quiet] [--json] "
+        "[--connect-timeout-ms MS] [--read-timeout-ms MS] <command>")
         .arg(QString::fromUtf8(argv0));
 }
 
-QString commandUsage(char const *argv0, QString const& command) {
+QString documentHelpText(char const *argv0) {
     QString executable = QString::fromUtf8(argv0);
-    if (command == QStringLiteral("list")) {
+    return QStringLiteral(
+        "%1\n"
+        "\n"
+        "Document commands:\n"
+        "  %2 --help|-h\n"
+        "  %2 --version|-v\n"
+        "  %2 --list|-l\n"
+        "  %2 --summon|-s mascot --name NAME [label]\n"
+        "  %2 --summon|-s mascot --data-id ID [label]\n"
+        "  %2 --summon|-s random [label]\n"
+        "  %2 --close LABEL\n"
+        "  %2 --close-all\n"
+        "  %2 --stop\n"
+        "  %2 --mascot|-m list\n"
+        "  %2 --mascot|-m add ZIP\n"
+        "  %2 --mascot|-m remove MASCOT\n"
+        "\n"
+        "Global options:\n"
+        "  --quiet  --json  --connect-timeout-ms MS  --read-timeout-ms MS\n"
+        "\n"
+        "Transport notes:\n"
+        "  Runtime commands auto-start a local runtime when needed.\n"
+        "  Commands use local IPC and do not use HTTP.\n"
+        "  --host and --port are no longer supported.\n"
+        "\n"
+        "Legacy commands remain supported:\n"
+        "  list, list-loaded, spawn, alter, dismiss, dismiss-all")
+        .arg(helpSynopsis(argv0), executable);
+}
+
+QString commandUsage(char const *argv0, QString const& commandName) {
+    QString executable = QString::fromUtf8(argv0);
+    if (commandName == QStringLiteral("list")) {
         return QStringLiteral("Usage: %1 [globals...] list [--selector JS] [--json]")
             .arg(executable);
     }
-    if (command == QStringLiteral("list-loaded")) {
+    if (commandName == QStringLiteral("list-loaded")) {
         return QStringLiteral("Usage: %1 [globals...] list-loaded [--sort-by-id] [--json]")
             .arg(executable);
     }
-    if (command == QStringLiteral("spawn")) {
+    if (commandName == QStringLiteral("spawn")) {
         return QStringLiteral(
             "Usage: %1 [globals...] spawn (--name NAME | --data-id ID) "
             "[--behavior NAME]... [--x X --y Y] [--json]").arg(executable);
     }
-    if (command == QStringLiteral("alter")) {
+    if (commandName == QStringLiteral("alter")) {
         return QStringLiteral(
             "Usage: %1 [globals...] alter --id ID_OR_AUTO [--selector JS]... "
             "[--behavior NAME]... [--x X --y Y] [--json]").arg(executable);
     }
-    if (command == QStringLiteral("dismiss")) {
+    if (commandName == QStringLiteral("dismiss")) {
         return QStringLiteral(
             "Usage: %1 [globals...] dismiss --id ID_OR_AUTO [--selector JS]")
             .arg(executable);
     }
-    if (command == QStringLiteral("dismiss-all")) {
-        return QStringLiteral(
-            "Usage: %1 [globals...] dismiss-all [--selector JS]").arg(executable);
+    if (commandName == QStringLiteral("dismiss-all")) {
+        return QStringLiteral("Usage: %1 [globals...] dismiss-all [--selector JS]")
+            .arg(executable);
     }
-    return generalUsage(argv0);
+    if (commandName == QStringLiteral("--summon")) {
+        return QStringLiteral(
+            "Usage: %1 [globals...] --summon|-s mascot (--name NAME | --data-id ID) [label]\n"
+            "       %1 [globals...] --summon|-s random [label]").arg(executable);
+    }
+    if (commandName == QStringLiteral("--close")) {
+        return QStringLiteral("Usage: %1 [globals...] --close LABEL").arg(executable);
+    }
+    if (commandName == QStringLiteral("--close-all")) {
+        return QStringLiteral("Usage: %1 [globals...] --close-all").arg(executable);
+    }
+    if (commandName == QStringLiteral("--stop")) {
+        return QStringLiteral("Usage: %1 [globals...] --stop").arg(executable);
+    }
+    if (commandName == QStringLiteral("--mascot")) {
+        return QStringLiteral(
+            "Usage: %1 [globals...] --mascot|-m list\n"
+            "       %1 [globals...] --mascot|-m add ZIP\n"
+            "       %1 [globals...] --mascot|-m remove MASCOT").arg(executable);
+    }
+    if (commandName == QStringLiteral("--list")) {
+        return QStringLiteral("Usage: %1 [globals...] --list|-l").arg(executable);
+    }
+    if (commandName == QStringLiteral("--version")) {
+        return QStringLiteral("Usage: %1 [globals...] --version|-v").arg(executable);
+    }
+    return documentHelpText(argv0);
 }
 
-CliError parseError(CliGlobalOptions const& global, QString const& message,
-    char const *argv0, QString const& command = {}, QString const& details = {})
+CliError parseError(CliGlobalOptions const&, QString const& message,
+    char const *argv0, QString const& commandName = {},
+    QString const& details = {})
 {
     CliError error;
     error.code = QStringLiteral("invalid_arguments");
     error.error = message;
     error.details = details;
-    error.usage = command.isEmpty() ? generalUsage(argv0) : commandUsage(argv0, command);
+    error.usage = commandName.isEmpty() ? documentHelpText(argv0)
+        : commandUsage(argv0, commandName);
     error.exitCode = 2;
-    Q_UNUSED(global);
     return error;
 }
 
@@ -121,19 +203,29 @@ bool parseDoubleValue(QString const& value, double &out) {
     return true;
 }
 
+bool parseOptionalLabel(QString const& value, std::optional<int> &out) {
+    int label = 0;
+    if (!parseIntValue(value, label) || label < 0) {
+        return false;
+    }
+    out = label;
+    return true;
+}
+
+void setBooleanGlobal(QString const& token, CliGlobalOptions &global) {
+    if (token == QStringLiteral("--quiet")) {
+        global.quiet = true;
+    }
+    else if (token == QStringLiteral("--json")) {
+        global.json = true;
+    }
+}
+
 bool applyGlobalOption(QString const& token, QString const& value,
     CliGlobalOptions &global)
 {
-    if (token == QStringLiteral("--host")) {
-        global.host = value;
-        return true;
-    }
-    if (token == QStringLiteral("--port")) {
-        int port = 0;
-        if (!parseIntValue(value, port) || port <= 0) {
-            return false;
-        }
-        global.port = port;
+    if (token == QStringLiteral("--host") || token == QStringLiteral("--port")) {
+        (void)value;
         return true;
     }
     if (token == QStringLiteral("--connect-timeout-ms")) {
@@ -155,33 +247,49 @@ bool applyGlobalOption(QString const& token, QString const& value,
     return false;
 }
 
-void setBooleanOption(QString const& token, CliGlobalOptions &global) {
-    if (token == QStringLiteral("--quiet")) {
-        global.quiet = true;
-    }
-    else if (token == QStringLiteral("--json")) {
-        global.json = true;
-    }
-}
-
 bool validateAnchor(MascotPatch const& patch) {
     return !patch.hasAnchor() || patch.hasCompleteAnchor();
 }
 
-CliCommandKind commandKindFor(QString const& command) {
-    if (command == QStringLiteral("list")) {
+CliCommandKind documentCommandKind(QString const& token) {
+    if (token == QStringLiteral("--help") || token == QStringLiteral("-h")) {
+        return CliCommandKind::Help;
+    }
+    if (token == QStringLiteral("--version") || token == QStringLiteral("-v")) {
+        return CliCommandKind::Version;
+    }
+    if (token == QStringLiteral("--list") || token == QStringLiteral("-l")) {
+        return CliCommandKind::DocumentList;
+    }
+    if (token == QStringLiteral("--summon") || token == QStringLiteral("-s")) {
+        return CliCommandKind::DocumentSummon;
+    }
+    if (token == QStringLiteral("--close")) {
+        return CliCommandKind::DocumentClose;
+    }
+    if (token == QStringLiteral("--stop")) {
+        return CliCommandKind::DocumentStop;
+    }
+    if (token == QStringLiteral("--mascot") || token == QStringLiteral("-m")) {
+        return CliCommandKind::DocumentMascot;
+    }
+    return CliCommandKind::DocumentCloseAll;
+}
+
+CliCommandKind legacyCommandKind(QString const& token) {
+    if (token == QStringLiteral("list")) {
         return CliCommandKind::ListMascots;
     }
-    if (command == QStringLiteral("list-loaded")) {
+    if (token == QStringLiteral("list-loaded")) {
         return CliCommandKind::ListLoadedMascots;
     }
-    if (command == QStringLiteral("spawn")) {
+    if (token == QStringLiteral("spawn")) {
         return CliCommandKind::SpawnMascot;
     }
-    if (command == QStringLiteral("alter")) {
+    if (token == QStringLiteral("alter")) {
         return CliCommandKind::AlterMascot;
     }
-    if (command == QStringLiteral("dismiss")) {
+    if (token == QStringLiteral("dismiss")) {
         return CliCommandKind::DismissMascot;
     }
     return CliCommandKind::DismissAllMascots;
@@ -196,7 +304,7 @@ bool isCliInvocation(int argc, char **argv) {
     int index = 1;
     while (index < argc) {
         QString token = QString::fromUtf8(argv[index]);
-        if (isCliCommand(token)) {
+        if (isLegacyCommand(token) || isDocumentCommand(token)) {
             return true;
         }
         if (isBooleanGlobal(token)) {
@@ -216,15 +324,15 @@ bool isCliInvocation(int argc, char **argv) {
 }
 
 CliParseResult parseCliArguments(int argc, char **argv) {
-    CliParseResult result;
+    CliParseResult result {};
     int index = 1;
     while (index < argc) {
         QString token = QString::fromUtf8(argv[index]);
-        if (isCliCommand(token)) {
+        if (isLegacyCommand(token) || isDocumentCommand(token)) {
             break;
         }
         if (isBooleanGlobal(token)) {
-            setBooleanOption(token, result.global);
+            setBooleanGlobal(token, result.global);
             ++index;
             continue;
         }
@@ -232,12 +340,22 @@ CliParseResult parseCliArguments(int argc, char **argv) {
             if (index + 1 >= argc) {
                 result.error = parseError(result.global,
                     QStringLiteral("Missing value for %1").arg(token), argv[0]);
+                result.hasError = true;
                 return result;
             }
             QString value = QString::fromUtf8(argv[index + 1]);
             if (!applyGlobalOption(token, value, result.global)) {
                 result.error = parseError(result.global,
                     QStringLiteral("Invalid value for %1").arg(token), argv[0]);
+                result.hasError = true;
+                return result;
+            }
+            if (token == QStringLiteral("--host") || token == QStringLiteral("--port")) {
+                result.error = parseError(result.global,
+                    QStringLiteral("%1 is not supported by the local IPC CLI")
+                        .arg(token),
+                    argv[0], {}, QStringLiteral("Use the local running instance instead of host/port routing."));
+                result.hasError = true;
                 return result;
             }
             index += 2;
@@ -245,20 +363,236 @@ CliParseResult parseCliArguments(int argc, char **argv) {
         }
         result.error = parseError(result.global,
             QStringLiteral("Unknown global option: %1").arg(token), argv[0]);
+        result.hasError = true;
         return result;
     }
 
     if (index >= argc) {
         result.error = parseError(result.global, QStringLiteral("Missing command"),
             argv[0]);
+        result.hasError = true;
         return result;
     }
 
-    QString commandName = QString::fromUtf8(argv[index++]);
-    CliCommand command;
+    QString commandToken = QString::fromUtf8(argv[index++]);
+    CliCommand &command = result.command;
+    result.hasCommand = true;
     command.global = result.global;
-    command.kind = commandKindFor(commandName);
+    command.commandName = commandToken;
 
+    if (isDocumentCommand(commandToken)) {
+        command.documentStyle = true;
+        command.kind = documentCommandKind(commandToken);
+
+        if (command.kind == CliCommandKind::Help ||
+            command.kind == CliCommandKind::Version ||
+            command.kind == CliCommandKind::DocumentList ||
+            command.kind == CliCommandKind::DocumentCloseAll ||
+            command.kind == CliCommandKind::DocumentStop)
+        {
+            if (index < argc) {
+                result.error = parseError(command.global,
+                    QStringLiteral("Unexpected argument: %1")
+                        .arg(QString::fromUtf8(argv[index])),
+                    argv[0], commandToken);
+                result.hasError = true;
+                return result;
+            }
+            result.global = command.global;
+            return result;
+        }
+
+        if (command.kind == CliCommandKind::DocumentMascot) {
+            if (index >= argc) {
+                result.error = parseError(command.global,
+                    QStringLiteral("Missing mascot command"), argv[0],
+                    commandToken);
+                result.hasError = true;
+                return result;
+            }
+            command.mascotAction = QString::fromUtf8(argv[index++]);
+            if (command.mascotAction == QStringLiteral("list")) {
+                if (index < argc) {
+                    result.error = parseError(command.global,
+                        QStringLiteral("Unexpected argument: %1")
+                            .arg(QString::fromUtf8(argv[index])),
+                        argv[0], commandToken);
+                    result.hasError = true;
+                    return result;
+                }
+                result.global = command.global;
+                return result;
+            }
+            if (command.mascotAction == QStringLiteral("add")) {
+                if (index >= argc) {
+                    result.error = parseError(command.global,
+                        QStringLiteral("Missing mascot archive path"),
+                        argv[0], commandToken);
+                    result.hasError = true;
+                    return result;
+                }
+                command.mascotArchivePath = QString::fromUtf8(argv[index++]);
+                if (index < argc) {
+                    result.error = parseError(command.global,
+                        QStringLiteral("Unexpected argument: %1")
+                            .arg(QString::fromUtf8(argv[index])),
+                        argv[0], commandToken);
+                    result.hasError = true;
+                    return result;
+                }
+                result.global = command.global;
+                return result;
+            }
+            if (command.mascotAction == QStringLiteral("remove")) {
+                if (index >= argc) {
+                    result.error = parseError(command.global,
+                        QStringLiteral("Missing mascot template name"),
+                        argv[0], commandToken);
+                    result.hasError = true;
+                    return result;
+                }
+                command.mascotTemplateName = QString::fromUtf8(argv[index++]);
+                if (index < argc) {
+                    result.error = parseError(command.global,
+                        QStringLiteral("Unexpected argument: %1")
+                            .arg(QString::fromUtf8(argv[index])),
+                        argv[0], commandToken);
+                    result.hasError = true;
+                    return result;
+                }
+                result.global = command.global;
+                return result;
+            }
+            result.error = parseError(command.global,
+                QStringLiteral("Mascot command must be list, add, or remove"),
+                argv[0], commandToken);
+            result.hasError = true;
+            return result;
+        }
+
+        if (command.kind == CliCommandKind::DocumentClose) {
+            if (index >= argc) {
+                result.error = parseError(command.global,
+                    QStringLiteral("Missing CLI label"), argv[0], commandToken);
+                result.hasError = true;
+                return result;
+            }
+            if (!parseOptionalLabel(QString::fromUtf8(argv[index++]), command.cliLabel)) {
+                result.error = parseError(command.global,
+                    QStringLiteral("CLI label must be a non-negative integer"),
+                    argv[0], commandToken);
+                result.hasError = true;
+                return result;
+            }
+            if (index < argc) {
+                result.error = parseError(command.global,
+                    QStringLiteral("Unexpected argument: %1")
+                        .arg(QString::fromUtf8(argv[index])),
+                    argv[0], commandToken);
+                result.hasError = true;
+                return result;
+            }
+            result.global = command.global;
+            return result;
+        }
+
+        if (index >= argc) {
+            result.error = parseError(command.global,
+                QStringLiteral("Missing summon mode"), argv[0], commandToken);
+            result.hasError = true;
+            return result;
+        }
+        command.summonMode = QString::fromUtf8(argv[index++]);
+        if (command.summonMode != QStringLiteral("mascot") &&
+            command.summonMode != QStringLiteral("random"))
+        {
+            result.error = parseError(command.global,
+                QStringLiteral("Summon mode must be mascot or random"),
+                argv[0], commandToken);
+            result.hasError = true;
+            return result;
+        }
+
+        while (index < argc) {
+            QString token = QString::fromUtf8(argv[index]);
+            if (token == QStringLiteral("--name")) {
+                ++index;
+                if (index >= argc) {
+                    result.error = parseError(command.global,
+                        QStringLiteral("Missing value for --name"),
+                        argv[0], commandToken);
+                    result.hasError = true;
+                    return result;
+                }
+                command.spawnRequest.name = QString::fromUtf8(argv[index++]);
+                continue;
+            }
+            if (token == QStringLiteral("--data-id")) {
+                ++index;
+                if (index >= argc) {
+                    result.error = parseError(command.global,
+                        QStringLiteral("Missing value for --data-id"),
+                        argv[0], commandToken);
+                    result.hasError = true;
+                    return result;
+                }
+                int dataId = 0;
+                if (!parseIntValue(QString::fromUtf8(argv[index++]), dataId)) {
+                    result.error = parseError(command.global,
+                        QStringLiteral("Invalid value for --data-id"),
+                        argv[0], commandToken);
+                    result.hasError = true;
+                    return result;
+                }
+                command.spawnRequest.dataId = dataId;
+                continue;
+            }
+            std::optional<int> label;
+            if (!parseOptionalLabel(token, label)) {
+                result.error = parseError(command.global,
+                    QStringLiteral("Unexpected argument: %1").arg(token),
+                    argv[0], commandToken);
+                result.hasError = true;
+                return result;
+            }
+            command.cliLabel = label;
+            ++index;
+            if (index < argc) {
+                result.error = parseError(command.global,
+                    QStringLiteral("Unexpected argument: %1")
+                        .arg(QString::fromUtf8(argv[index])),
+                    argv[0], commandToken);
+                result.hasError = true;
+                return result;
+            }
+        }
+
+        if (command.summonMode == QStringLiteral("mascot")) {
+            if (command.spawnRequest.name.has_value() ==
+                command.spawnRequest.dataId.has_value())
+            {
+                result.error = parseError(command.global,
+                    QStringLiteral("You must specify one of --name or --data-id"),
+                    argv[0], commandToken);
+                result.hasError = true;
+                return result;
+            }
+        }
+        else if (command.spawnRequest.name.has_value() ||
+            command.spawnRequest.dataId.has_value())
+        {
+            result.error = parseError(command.global,
+                QStringLiteral("random summon does not accept --name or --data-id"),
+                argv[0], commandToken);
+            result.hasError = true;
+            return result;
+        }
+
+        result.global = command.global;
+        return result;
+    }
+
+    command.kind = legacyCommandKind(commandToken);
     while (index < argc) {
         QString token = QString::fromUtf8(argv[index++]);
         if (token == QStringLiteral("--json")) {
@@ -270,7 +604,8 @@ CliParseResult parseCliArguments(int argc, char **argv) {
             if (index >= argc) {
                 result.error = parseError(command.global,
                     QStringLiteral("Missing value for %1").arg(option), argv[0],
-                    commandName);
+                    commandToken);
+                result.hasError = true;
                 return false;
             }
             value = QString::fromUtf8(argv[index++]);
@@ -311,7 +646,8 @@ CliParseResult parseCliArguments(int argc, char **argv) {
                 if (!parseIntValue(value, dataId)) {
                     result.error = parseError(command.global,
                         QStringLiteral("Invalid value for --data-id"), argv[0],
-                        commandName);
+                        commandToken);
+                    result.hasError = true;
                     return result;
                 }
                 command.spawnRequest.dataId = dataId;
@@ -334,7 +670,8 @@ CliParseResult parseCliArguments(int argc, char **argv) {
                 if (!parseDoubleValue(value, x)) {
                     result.error = parseError(command.global,
                         QStringLiteral("Invalid value for --x"), argv[0],
-                        commandName);
+                        commandToken);
+                    result.hasError = true;
                     return result;
                 }
                 command.spawnRequest.patch.anchorX = x;
@@ -349,7 +686,8 @@ CliParseResult parseCliArguments(int argc, char **argv) {
                 if (!parseDoubleValue(value, y)) {
                     result.error = parseError(command.global,
                         QStringLiteral("Invalid value for --y"), argv[0],
-                        commandName);
+                        commandToken);
+                    result.hasError = true;
                     return result;
                 }
                 command.spawnRequest.patch.anchorY = y;
@@ -390,7 +728,8 @@ CliParseResult parseCliArguments(int argc, char **argv) {
                 if (!parseDoubleValue(value, x)) {
                     result.error = parseError(command.global,
                         QStringLiteral("Invalid value for --x"), argv[0],
-                        commandName);
+                        commandToken);
+                    result.hasError = true;
                     return result;
                 }
                 command.patch.anchorX = x;
@@ -405,7 +744,8 @@ CliParseResult parseCliArguments(int argc, char **argv) {
                 if (!parseDoubleValue(value, y)) {
                     result.error = parseError(command.global,
                         QStringLiteral("Invalid value for --y"), argv[0],
-                        commandName);
+                        commandToken);
+                    result.hasError = true;
                     return result;
                 }
                 command.patch.anchorY = y;
@@ -442,7 +782,8 @@ CliParseResult parseCliArguments(int argc, char **argv) {
         }
 
         result.error = parseError(command.global,
-            QStringLiteral("Unknown option: %1").arg(token), argv[0], commandName);
+            QStringLiteral("Unknown option: %1").arg(token), argv[0], commandToken);
+        result.hasError = true;
         return result;
     }
 
@@ -451,7 +792,8 @@ CliParseResult parseCliArguments(int argc, char **argv) {
     {
         result.error = parseError(command.global,
             QStringLiteral("--json and --sort-by-id cannot be used together."),
-            argv[0], commandName);
+            argv[0], commandToken);
+        result.hasError = true;
         return result;
     }
 
@@ -461,26 +803,30 @@ CliParseResult parseCliArguments(int argc, char **argv) {
         {
             result.error = parseError(command.global,
                 QStringLiteral("You must specify one of name or data-id."),
-                argv[0], commandName);
+                argv[0], commandToken);
+            result.hasError = true;
             return result;
         }
         if (!validateAnchor(command.spawnRequest.patch)) {
             result.error = parseError(command.global,
                 QStringLiteral("X and Y must be specified together"),
-                argv[0], commandName);
+                argv[0], commandToken);
+            result.hasError = true;
             return result;
         }
     }
     else if (command.kind == CliCommandKind::AlterMascot) {
         if (command.idToken.isEmpty()) {
             result.error = parseError(command.global,
-                QStringLiteral("Missing required option --id"), argv[0], commandName);
+                QStringLiteral("Missing required option --id"), argv[0], commandToken);
+            result.hasError = true;
             return result;
         }
         if (!validateAnchor(command.patch)) {
             result.error = parseError(command.global,
                 QStringLiteral("X and Y must be specified together"),
-                argv[0], commandName);
+                argv[0], commandToken);
+            result.hasError = true;
             return result;
         }
     }
@@ -488,11 +834,11 @@ CliParseResult parseCliArguments(int argc, char **argv) {
         command.idToken.isEmpty())
     {
         result.error = parseError(command.global,
-            QStringLiteral("Missing required option --id"), argv[0], commandName);
+            QStringLiteral("Missing required option --id"), argv[0], commandToken);
+        result.hasError = true;
         return result;
     }
 
     result.global = command.global;
-    result.command = command;
     return result;
 }

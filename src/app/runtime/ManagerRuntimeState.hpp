@@ -54,7 +54,11 @@ struct ShijimaManagerRuntimeState {
     QString importOnShowPath;
     std::list<ShijimaWidget *> mascots;
     std::map<int, ShijimaWidget *> mascotsById;
+    QMap<int, int> cliLabelToMascotId;
+    QMap<int, int> cliLabelByMascotId;
+    int nextCliLabel = 0;
     QString mascotsPath;
+    bool cliRuntimeMode = false;
     bool hasTickCallbacks = false;
     std::atomic<bool> shuttingDown{false};
     std::mutex mutex;

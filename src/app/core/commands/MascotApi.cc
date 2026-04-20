@@ -83,6 +83,12 @@ QJsonObject mascotInfoToJson(MascotInfo const& mascot) {
     object["id"] = mascot.id;
     object["data_id"] = mascot.dataId;
     object["name"] = mascot.name;
+    if (mascot.cliLabel.has_value()) {
+        object["label"] = mascot.cliLabel.value();
+    }
+    else {
+        object["label"] = QJsonValue::Null;
+    }
     object["anchor"] = anchorToJson(mascot.anchorX, mascot.anchorY);
     if (mascot.activeBehavior.has_value()) {
         object["active_behavior"] = mascot.activeBehavior.value();
@@ -97,6 +103,35 @@ QJsonObject loadedMascotInfoToJson(LoadedMascotInfo const& mascot) {
     QJsonObject object;
     object["id"] = mascot.id;
     object["name"] = mascot.name;
+    return object;
+}
+
+QJsonObject mascotPatchToJson(MascotPatch const& patch) {
+    QJsonObject object;
+    if (patch.hasCompleteAnchor()) {
+        object["anchor"] = anchorToJson(patch.anchorX.value(), patch.anchorY.value());
+    }
+    if (patch.behavior.has_value()) {
+        object["behavior"] = patch.behavior.value();
+    }
+    return object;
+}
+
+QJsonObject spawnMascotRequestToJson(SpawnMascotRequest const& request) {
+    QJsonObject object = mascotPatchToJson(request.patch);
+    if (request.name.has_value()) {
+        object["name"] = request.name.value();
+    }
+    if (request.dataId.has_value()) {
+        object["data_id"] = request.dataId.value();
+    }
+    return object;
+}
+
+QJsonObject cliLabelInfoToJson(CliLabelInfo const& info) {
+    QJsonObject object;
+    object["label"] = info.label;
+    object["mascot_id"] = info.mascotId;
     return object;
 }
 
@@ -145,6 +180,13 @@ bool mascotInfoFromJson(QJsonValue const& value, MascotInfo &mascot,
     mascot.id = idValue.toInt();
     mascot.dataId = dataIdValue.toInt();
     mascot.name = nameValue.toString();
+    auto labelValue = object.value("label");
+    if (labelValue.isDouble()) {
+        mascot.cliLabel = labelValue.toInt();
+    }
+    else {
+        mascot.cliLabel.reset();
+    }
     mascot.anchorX = anchorX;
     mascot.anchorY = anchorY;
     auto behaviorValue = object.value("active_behavior");
@@ -154,6 +196,82 @@ bool mascotInfoFromJson(QJsonValue const& value, MascotInfo &mascot,
     else {
         mascot.activeBehavior.reset();
     }
+    return true;
+}
+
+bool mascotPatchFromJson(QJsonValue const& value, MascotPatch &patch,
+    QString *errorMessage)
+{
+    patch = MascotPatch {};
+    if (!value.isObject()) {
+        if (errorMessage != nullptr) {
+            *errorMessage = QStringLiteral("patch must be an object");
+        }
+        return false;
+    }
+    auto object = value.toObject();
+    auto anchorValue = object.value("anchor");
+    if (!anchorValue.isUndefined() && !anchorValue.isNull()) {
+        double x = 0.0;
+        double y = 0.0;
+        if (!parseAnchor(anchorValue, x, y, errorMessage)) {
+            return false;
+        }
+        patch.anchorX = x;
+        patch.anchorY = y;
+    }
+    auto behaviorValue = object.value("behavior");
+    if (behaviorValue.isString()) {
+        patch.behavior = behaviorValue.toString();
+    }
+    return true;
+}
+
+bool spawnMascotRequestFromJson(QJsonValue const& value,
+    SpawnMascotRequest &request, QString *errorMessage)
+{
+    request = SpawnMascotRequest {};
+    if (!value.isObject()) {
+        if (errorMessage != nullptr) {
+            *errorMessage = QStringLiteral("request must be an object");
+        }
+        return false;
+    }
+    auto object = value.toObject();
+    auto nameValue = object.value("name");
+    if (nameValue.isString()) {
+        request.name = nameValue.toString();
+    }
+    auto dataIdValue = object.value("data_id");
+    if (dataIdValue.isDouble()) {
+        request.dataId = dataIdValue.toInt();
+    }
+    if (!mascotPatchFromJson(object, request.patch, errorMessage)) {
+        return false;
+    }
+    return true;
+}
+
+bool cliLabelInfoFromJson(QJsonValue const& value, CliLabelInfo &info,
+    QString *errorMessage)
+{
+    if (!value.isObject()) {
+        if (errorMessage != nullptr) {
+            *errorMessage = QStringLiteral("CLI label entry must be an object");
+        }
+        return false;
+    }
+    auto object = value.toObject();
+    auto labelValue = object.value("label");
+    auto mascotIdValue = object.value("mascot_id");
+    if (!labelValue.isDouble() || !mascotIdValue.isDouble()) {
+        if (errorMessage != nullptr) {
+            *errorMessage = QStringLiteral("CLI label entry is missing required fields");
+        }
+        return false;
+    }
+    info.label = labelValue.toInt();
+    info.mascotId = mascotIdValue.toInt();
     return true;
 }
 

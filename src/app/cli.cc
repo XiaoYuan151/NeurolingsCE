@@ -27,13 +27,13 @@ bool shijimaShouldRunCli(int argc, char **argv) {
 
 int shijimaRunCli(int argc, char **argv) {
     auto parsed = parseCliArguments(argc, argv);
-    if (parsed.error.has_value()) {
-        APP_LOG_ERROR("cli") << parsed.error->error.toStdString();
-        return writeCliError(parsed.global, parsed.error.value());
+    if (parsed.hasError) {
+        APP_LOG_ERROR("cli") << parsed.error.error.toStdString();
+        return writeCliError(parsed.global, parsed.error);
     }
     APP_LOG_INFO("cli") << "CLI command started";
-    auto result = executeCliCommand(parsed.command.value());
-    int ret = writeCliOutput(parsed.command.value(), result);
+    auto result = executeCliCommand(parsed.command);
+    int ret = writeCliOutput(parsed.command, result);
     APP_LOG_INFO("cli") << "CLI command finished exit_code=" << ret;
     return ret;
 }

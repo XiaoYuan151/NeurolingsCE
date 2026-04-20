@@ -27,6 +27,8 @@
 #include <QCloseEvent>
 #include <QCoreApplication>
 #include <QGuiApplication>
+#include <QMetaObject>
+#include <QThread>
 
 static ShijimaManager *m_defaultManager = nullptr;
 
@@ -80,6 +82,7 @@ void ShijimaManager::shutdownForQuit() {
         m_runtime->windowObserverTimer = 0;
     }
 
+    m_localApi.stop();
     m_httpApi.stop();
 
     for (auto mascot : m_runtime->mascots) {
@@ -93,6 +96,9 @@ void ShijimaManager::shutdownForQuit() {
     }
     m_runtime->mascots.clear();
     m_runtime->mascotsById.clear();
+    m_runtime->cliLabelToMascotId.clear();
+    m_runtime->cliLabelByMascotId.clear();
+    m_runtime->nextCliLabel = 0;
 
     if (m_ui->sandboxWidget != nullptr) {
         m_ui->sandboxWidget->close();
@@ -106,16 +112,16 @@ void ShijimaManager::onTickSync(std::function<void(ShijimaManager *)> callback) 
         return;
     }
 
-    auto lock = acquireLock();
-    if (m_runtime->shuttingDown.load()) {
+    if (QThread::currentThread() == thread()) {
+        callback(this);
         return;
     }
 
-    m_runtime->hasTickCallbacks = true;
-    m_runtime->tickCallbacks.push_back(callback);
-    m_runtime->tickCallbackCompletion.wait(lock, [this]{
-        return m_runtime->shuttingDown.load() || m_runtime->tickCallbacks.empty();
-    });
+    QMetaObject::invokeMethod(this, [this, callback]() {
+        if (!m_runtime->shuttingDown.load()) {
+            callback(this);
+        }
+    }, Qt::BlockingQueuedConnection);
 }
 
 void ShijimaManager::closeEvent(QCloseEvent *event) {

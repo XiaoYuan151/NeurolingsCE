@@ -26,6 +26,7 @@
 
 #include <memory>
 
+#include <QCoreApplication>
 #include <QDir>
 #include <QEvent>
 #include <QFile>
@@ -46,8 +47,11 @@ ShijimaManager::ShijimaManager(QWidget *parent):
     m_runtime(std::make_unique<ShijimaManagerRuntimeState>()),
     m_ui(std::make_unique<ShijimaManagerUiState>()),
     m_settings("pixelomer", "Shijima-Qt"),
-    m_httpApi(this)
+    m_httpApi(this),
+    m_localApi(this)
 {
+    m_runtime->cliRuntimeMode =
+        qApp->property("neurolingsce.cliRuntime").toBool();
     m_ui->listWidget = new QListWidget(this);
 
     for (auto screen : QGuiApplication::screens()) {
@@ -140,12 +144,21 @@ ShijimaManager::ShijimaManager(QWidget *parent):
     m_runtime->detachThreshold = m_settings.value("detachThreshold",
         QVariant::fromValue(30.0)).toDouble();
 
-    setupNavigation();
-    setManagerVisible(true);
+    if (!m_runtime->cliRuntimeMode) {
+        setupNavigation();
+    }
+    if (!m_runtime->cliRuntimeMode) {
+        setManagerVisible(true);
+    }
     m_constructing = false;
 
-    ShijimaManagerUiInternal::setupTrayIcon(this);
-    m_httpApi.start("127.0.0.1", 32456);
+    if (!m_runtime->cliRuntimeMode) {
+        ShijimaManagerUiInternal::setupTrayIcon(this);
+    }
+    m_localApi.start();
+    if (!m_runtime->cliRuntimeMode) {
+        m_httpApi.start("127.0.0.1", 32456);
+    }
     APP_LOG_INFO("startup") << "Manager window initialized";
 }
 

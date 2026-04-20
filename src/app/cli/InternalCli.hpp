@@ -27,6 +27,14 @@
 #include <optional>
 
 enum class CliCommandKind {
+    Help,
+    Version,
+    DocumentList,
+    DocumentSummon,
+    DocumentClose,
+    DocumentCloseAll,
+    DocumentStop,
+    DocumentMascot,
     ListMascots,
     ListLoadedMascots,
     SpawnMascot,
@@ -38,20 +46,25 @@ enum class CliCommandKind {
 struct CliGlobalOptions {
     bool quiet = false;
     bool json = false;
-    QString host = QStringLiteral("127.0.0.1");
-    int port = 32456;
     int connectTimeoutMs = 500;
     int readTimeoutMs = 500;
 };
 
 struct CliCommand {
     CliGlobalOptions global;
-    CliCommandKind kind = CliCommandKind::ListMascots;
+    CliCommandKind kind = CliCommandKind::Help;
+    bool documentStyle = false;
+    QString commandName;
     QString idToken;
+    QString summonMode;
+    QString mascotAction;
+    QString mascotArchivePath;
+    QString mascotTemplateName;
     QString selector;
     QStringList selectors;
     QStringList behaviors;
     bool sortById = false;
+    std::optional<int> cliLabel;
     SpawnMascotRequest spawnRequest;
     MascotPatch patch;
 };
@@ -69,13 +82,16 @@ struct CliExecutionResult {
     QList<MascotInfo> mascots;
     QList<LoadedMascotInfo> loadedMascots;
     std::optional<MascotInfo> mascot;
+    QString removedTemplateName;
     std::optional<CliError> error;
 };
 
 struct CliParseResult {
     CliGlobalOptions global;
-    std::optional<CliCommand> command;
-    std::optional<CliError> error;
+    CliCommand command;
+    CliError error;
+    bool hasCommand = false;
+    bool hasError = false;
 };
 
 bool isCliInvocation(int argc, char **argv);

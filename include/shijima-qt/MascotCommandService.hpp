@@ -35,6 +35,9 @@ public:
         QList<MascotInfo> &out) const;
     MascotCommandStatus spawnMascot(SpawnMascotRequest const& request,
         MascotInfo &out) const;
+    MascotCommandStatus registerCliLabel(RegisterCliLabelRequest const& request,
+        CliLabelInfo &out) const;
+    MascotCommandStatus getCliLabel(int cliLabel, CliLabelInfo &out) const;
     MascotCommandStatus alterMascot(int mascotId, MascotPatch const& patch,
         MascotInfo &out) const;
     MascotCommandStatus getMascot(int mascotId, MascotInfo &out) const;
@@ -42,6 +45,10 @@ public:
     MascotCommandStatus dismissAllMascots(
         DismissAllMascotsRequest const& request) const;
     MascotCommandStatus listLoadedMascots(QList<LoadedMascotInfo> &out) const;
+    MascotCommandStatus importMascotTemplate(QString const& archivePath,
+        QList<LoadedMascotInfo> &out) const;
+    MascotCommandStatus removeMascotTemplate(QString const& mascotName) const;
+    MascotCommandStatus stopRuntime() const;
     MascotCommandStatus getLoadedMascot(int mascotId,
         LoadedMascotInfo &out) const;
     MascotCommandStatus getLoadedMascotPreviewPng(int mascotId,

@@ -110,6 +110,80 @@ std::map<int, ShijimaWidget *> const& ShijimaManager::mascotsById() {
     return m_runtime->mascotsById;
 }
 
+std::optional<int> ShijimaManager::cliLabelForMascot(int mascotId) const {
+    auto it = m_runtime->cliLabelByMascotId.constFind(mascotId);
+    if (it == m_runtime->cliLabelByMascotId.cend()) {
+        return std::nullopt;
+    }
+    return it.value();
+}
+
+std::optional<int> ShijimaManager::mascotIdForCliLabel(int cliLabel) const {
+    auto it = m_runtime->cliLabelToMascotId.constFind(cliLabel);
+    if (it == m_runtime->cliLabelToMascotId.cend()) {
+        return std::nullopt;
+    }
+    return it.value();
+}
+
+bool ShijimaManager::assignCliLabel(int mascotId,
+    std::optional<int> preferredLabel, int &assignedLabel, QString &errorMessage)
+{
+    if (m_runtime->mascotsById.count(mascotId) != 1) {
+        errorMessage = QStringLiteral("No such mascot");
+        return false;
+    }
+    if (auto existing = cliLabelForMascot(mascotId); existing.has_value()) {
+        if (!preferredLabel.has_value() || preferredLabel.value() == existing.value()) {
+            assignedLabel = existing.value();
+            return true;
+        }
+        errorMessage = QStringLiteral("Mascot already has a different CLI label");
+        return false;
+    }
+
+    int label = -1;
+    if (preferredLabel.has_value()) {
+        label = preferredLabel.value();
+        if (label < 0) {
+            errorMessage = QStringLiteral("CLI label must be greater than or equal to 0");
+            return false;
+        }
+        if (m_runtime->cliLabelToMascotId.contains(label)) {
+            errorMessage = QStringLiteral("CLI label is already in use");
+            return false;
+        }
+    }
+    else {
+        label = m_runtime->nextCliLabel;
+        while (m_runtime->cliLabelToMascotId.contains(label)) {
+            ++label;
+        }
+        m_runtime->nextCliLabel = label + 1;
+    }
+
+    m_runtime->cliLabelToMascotId[label] = mascotId;
+    m_runtime->cliLabelByMascotId[mascotId] = label;
+    assignedLabel = label;
+    return true;
+}
+
+void ShijimaManager::clearCliLabelForMascot(int mascotId) {
+    auto it = m_runtime->cliLabelByMascotId.find(mascotId);
+    if (it == m_runtime->cliLabelByMascotId.end()) {
+        return;
+    }
+    int cliLabel = it.value();
+    m_runtime->cliLabelByMascotId.erase(it);
+    m_runtime->cliLabelToMascotId.remove(cliLabel);
+}
+
+void ShijimaManager::clearCliLabels() {
+    m_runtime->cliLabelToMascotId.clear();
+    m_runtime->cliLabelByMascotId.clear();
+    m_runtime->nextCliLabel = 0;
+}
+
 void ShijimaManager::reloadMascot(QString const& name) {
     if (m_runtime->loadedMascots.contains(name) && !m_runtime->loadedMascots[name]->deletable()) {
         APP_LOG_WARN("mascot") << "Refusing to unload non-deletable mascot template name=\""
@@ -224,6 +298,46 @@ void ShijimaManager::reloadMascots(std::set<std::string> const& mascots) {
     refreshListWidget();
 }
 
+bool ShijimaManager::removeMascotTemplate(QString const& name,
+    QString &errorMessage)
+{
+    if (!m_runtime->loadedMascots.contains(name)) {
+        errorMessage = QStringLiteral("No such mascot template");
+        return false;
+    }
+
+    auto *mascotData = m_runtime->loadedMascots[name];
+    if (mascotData == nullptr) {
+        errorMessage = QStringLiteral("No such mascot template");
+        return false;
+    }
+    if (!mascotData->deletable()) {
+        errorMessage = QStringLiteral("Mascot template cannot be deleted");
+        return false;
+    }
+
+    std::filesystem::path path = mascotData->path().toStdString();
+    APP_LOG_INFO("mascot") << "Deleting mascot template name=\""
+        << name.toStdString() << "\" path=\"" << path.string() << "\"";
+    try {
+        std::filesystem::remove_all(path / "img");
+        std::filesystem::remove_all(path / "sound");
+        std::filesystem::remove(path / "actions.xml");
+        std::filesystem::remove(path / "behaviors.xml");
+        std::filesystem::remove(path);
+    }
+    catch (std::exception &ex) {
+        APP_LOG_ERROR("mascot") << "Failed to delete mascot template path=\""
+            << path.string() << "\": " << ex.what();
+        errorMessage = QString::fromUtf8(ex.what());
+        return false;
+    }
+
+    reloadMascot(name);
+    refreshListWidget();
+    return true;
+}
+
 void ShijimaManager::tick() {
     if (m_runtime->hasTickCallbacks) {
         auto lock = acquireLock();
@@ -238,7 +352,7 @@ void ShijimaManager::tick() {
     if (m_ui->sandboxWidget != nullptr && !m_ui->sandboxWidget->isVisible()) {
         setWindowedMode(false);
 #if !defined(__APPLE__)
-        if (m_runtime->mascots.size() == 0) {
+        if (m_runtime->mascots.size() == 0 && !m_runtime->cliRuntimeMode) {
             setManagerVisible(true);
         }
 #endif
@@ -246,7 +360,7 @@ void ShijimaManager::tick() {
 
     if (m_runtime->mascots.size() == 0) {
 #if !defined(__APPLE__)
-        if (!windowedMode() && !m_wasVisible) {
+        if (!windowedMode() && !m_wasVisible && !m_runtime->cliRuntimeMode) {
             setManagerVisible(true);
         }
 #endif
@@ -260,6 +374,7 @@ void ShijimaManager::tick() {
         ShijimaWidget *shimeji = *iter;
         if (!shimeji->isVisible()) {
             int mascotId = shimeji->mascotId();
+            clearCliLabelForMascot(mascotId);
             delete shimeji;
             auto erasePos = iter;
             ++iter;
@@ -354,7 +469,9 @@ void ShijimaManager::tick() {
         env->reset_scale();
     }
 
-    if (m_runtime->mascots.size() == 0 && !windowedMode()) {
+    if (m_runtime->mascots.size() == 0 && !windowedMode() &&
+        !m_runtime->cliRuntimeMode)
+    {
         setManagerVisible(true);
     }
 

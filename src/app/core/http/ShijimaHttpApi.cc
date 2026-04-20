@@ -108,6 +108,19 @@ SpawnMascotRequest spawnRequestFromJson(QJsonObject object) {
     return request;
 }
 
+RegisterCliLabelRequest cliLabelRequestFromJson(QJsonObject object) {
+    RegisterCliLabelRequest request;
+    auto mascotIdValue = object.take("mascot_id");
+    if (mascotIdValue.isDouble()) {
+        request.mascotId = mascotIdValue.toInt();
+    }
+    auto labelValue = object.take("label");
+    if (labelValue.isDouble()) {
+        request.label = labelValue.toInt();
+    }
+    return request;
+}
+
 void sendJson(Response &res, QJsonObject const& object) {
     QJsonDocument doc { object };
     auto bytes = doc.toJson(QJsonDocument::Compact);
@@ -274,6 +287,45 @@ ShijimaHttpApi::ShijimaHttpApi(ShijimaManager *manager): m_server(new Server),
         [this](Request const&, Response &res)
     {
         sendJson(res, pingInfoToJson(m_service.ping()));
+    });
+    m_server->Post("/shijima/api/v1/cli/labels",
+        [this](Request const& req, Response &res)
+    {
+        auto json = jsonForRequest(req);
+        if (!json.has_value()) {
+            badRequest(req, res);
+            return;
+        }
+        auto request = cliLabelRequestFromJson(*json);
+        if (request.mascotId < 0) {
+            badRequest(req, res);
+            return;
+        }
+        CliLabelInfo labelInfo;
+        auto status = m_service.registerCliLabel(request, labelInfo);
+        if (!status.ok()) {
+            sendError(res, status);
+            return;
+        }
+        QJsonObject object;
+        object["label"] = labelInfo.label;
+        object["mascot_id"] = labelInfo.mascotId;
+        sendJson(res, object);
+    });
+    m_server->Get("/shijima/api/v1/cli/labels/([0-9]+)",
+        [this](Request const& req, Response &res)
+    {
+        auto label = std::stoi(req.matches[1].str());
+        CliLabelInfo labelInfo;
+        auto status = m_service.getCliLabel(label, labelInfo);
+        if (!status.ok()) {
+            sendError(res, status);
+            return;
+        }
+        QJsonObject object;
+        object["label"] = labelInfo.label;
+        object["mascot_id"] = labelInfo.mascotId;
+        sendJson(res, object);
     });
     m_server->Get("/shijima/api/v1/loadedMascots/([0-9]+)",
         [this](Request const& req, Response &res)

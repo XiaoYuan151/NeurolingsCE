@@ -32,7 +32,9 @@
 #include <list>
 #include <functional>
 #include <mutex>
+#include <optional>
 #include "shijima-qt/ShijimaHttpApi.hpp"
+#include "shijima-qt/ShijimaLocalApi.hpp"
 #include "ElaWindow.h"
 
 class MascotData;
@@ -71,10 +73,19 @@ public:
     void setManagerVisible(bool visible);
     void importOnShow(QString const& path);
     void quitAction();
+    std::set<std::string> import(QString const& path) noexcept;
+    void reloadMascots(std::set<std::string> const& mascots);
+    bool removeMascotTemplate(QString const& name, QString &errorMessage);
     QMap<QString, MascotData *> const& loadedMascots();
     QMap<int, MascotData *> const& loadedMascotsById();
     std::list<ShijimaWidget *> const& mascots();
     std::map<int, ShijimaWidget *> const& mascotsById();
+    std::optional<int> cliLabelForMascot(int mascotId) const;
+    std::optional<int> mascotIdForCliLabel(int cliLabel) const;
+    bool assignCliLabel(int mascotId, std::optional<int> preferredLabel,
+        int &assignedLabel, QString &errorMessage);
+    void clearCliLabelForMascot(int mascotId);
+    void clearCliLabels();
     ShijimaWidget *hitTest(QPoint const& screenPos);
     void onTickSync(std::function<void(ShijimaManager *)> callback);
     ~ShijimaManager();
@@ -97,7 +108,6 @@ private:
     void reloadMascot(QString const& name);
     void askClose();
     void itemDoubleClicked(QListWidgetItem *qItem);
-    void reloadMascots(std::set<std::string> const& mascots);
     void loadAllMascots();
     void syncMascotLibrary();
     void refreshListWidget();
@@ -113,7 +123,6 @@ private:
     void setWindowedMode(bool windowedMode);
     void screenAdded(QScreen *);
     void screenRemoved(QScreen *);
-    std::set<std::string> import(QString const& path) noexcept;
     void importWithDialog(QList<QString> const& paths);
     void tick();
     void retranslateUi();
@@ -128,4 +137,5 @@ private:
     bool m_wasVisible = false;
     bool m_constructing = true;
     ShijimaHttpApi m_httpApi;
+    ShijimaLocalApi m_localApi;
 };

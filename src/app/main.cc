@@ -25,8 +25,8 @@
 #include "Platform/Platform.hpp"
 #include "shijima-qt/ShijimaManager.hpp"
 #include "shijima-qt/AssetLoader.hpp"
+#include "shijima-qt/ShijimaLocalApi.hpp"
 #include "shijima-qt/cli.hpp"
-#include <httplib.h>
 #include "ElaApplication.h"
 #include <exception>
 #include <sstream>
@@ -36,6 +36,17 @@
 #endif
 
 namespace {
+
+QString const kCliRuntimeArgument = QStringLiteral("--neurolingsce-cli-runtime");
+
+bool cliRuntimeMode(int argc, char **argv) {
+    for (int i = 1; i < argc; ++i) {
+        if (QString::fromUtf8(argv[i]) == kCliRuntimeArgument) {
+            return true;
+        }
+    }
+    return false;
+}
 
 #ifdef _WIN32
 LONG WINAPI appUnhandledExceptionFilter(EXCEPTION_POINTERS *info) {
@@ -86,6 +97,7 @@ int main(int argc, char **argv) {
         AppLog::shutdown();
         return ret;
     }
+    bool const startedForCli = cliRuntimeMode(argc, argv);
     Platform::initialize(argc, argv);
     #ifdef SHIJIMA_LOGGING_ENABLED
         shijima::set_log_level(SHIJIMA_LOG_PARSER | SHIJIMA_LOG_WARNINGS);
@@ -93,6 +105,10 @@ int main(int argc, char **argv) {
     QApplication app(argc, argv);
     app.setApplicationName(QStringLiteral(APP_NAME));
     app.setApplicationDisplayName(QStringLiteral(APP_DISPLAY_NAME));
+    app.setProperty("neurolingsce.cliRuntime", startedForCli);
+    if (startedForCli) {
+        app.setQuitOnLastWindowClosed(false);
+    }
     AppLog::initialize(&app);
     std::set_terminate(appTerminateHandler);
 #ifdef _WIN32
@@ -109,19 +125,26 @@ int main(int argc, char **argv) {
         }
     }
     try {
-        httplib::Client pingClient { "http://127.0.0.1:32456" };
-        pingClient.set_connection_timeout(0, 500000);
-        pingClient.set_read_timeout(0, 500000);
-        auto pingResult = pingClient.Get("/shijima/api/v1/ping");
-        if (pingResult != nullptr) {
-            APP_LOG_ERROR("startup") << "Single-instance guard rejected startup; ping endpoint already responded";
+        if (shijimaLocalApiPing()) {
+            APP_LOG_ERROR("startup") << "Single-instance guard rejected startup; local IPC endpoint already responded";
+            if (startedForCli) {
+                AppLog::shutdown();
+                return 0;
+            }
             throw std::runtime_error(QCoreApplication::translate("main", APP_NAME " is already running!").toStdString());
         }
         APP_LOG_INFO("startup") << "Application startup checks passed";
-        ShijimaManager::defaultManager()->show();
+        auto *manager = ShijimaManager::defaultManager();
+        if (!startedForCli) {
+            manager->show();
+        }
     }
     catch (std::exception &ex) {
         APP_LOG_ERROR("startup") << "Failed to start application: " << ex.what();
+        if (startedForCli) {
+            AppLog::shutdown();
+            return 1;
+        }
         QMessageBox *msg = new QMessageBox {};
         msg->setText(QCoreApplication::translate("main", APP_NAME " failed to start. Reason: ") +
             QString::fromUtf8(ex.what()));

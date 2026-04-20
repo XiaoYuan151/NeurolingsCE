@@ -29,7 +29,7 @@ endif()
 
 option(SHIJIMA_USE_QTMULTIMEDIA "Enable Qt Multimedia support" ON)
 
-find_package(Qt6 QUIET COMPONENTS Core Gui Widgets Concurrent LinguistTools)
+find_package(Qt6 QUIET COMPONENTS Core Gui Widgets Concurrent Network LinguistTools)
 if(NOT Qt6_FOUND)
   message(FATAL_ERROR
     "Qt6 not found. Set one of the following and reconfigure:\n"
@@ -157,9 +157,11 @@ set(_shijima_generated_dir "${CMAKE_CURRENT_BINARY_DIR}")
 set(_shijima_licenses_header "${_shijima_generated_dir}/licenses_generated.hpp")
 
 add_executable(NeurolingsCE)
+add_executable(NeurolingsCECli)
 
 if(MSVC)
   set_property(TARGET NeurolingsCE PROPERTY MSVC_RUNTIME_LIBRARY "${_shijima_msvc_runtime}")
+  set_property(TARGET NeurolingsCECli PROPERTY MSVC_RUNTIME_LIBRARY "${_shijima_msvc_runtime}")
 endif()
 
 target_sources(NeurolingsCE PRIVATE
@@ -170,6 +172,8 @@ target_sources(NeurolingsCE PRIVATE
   src/app/core/assets/AssetLoader.cc
   src/app/core/commands/MascotApi.cc
   src/app/core/commands/MascotCommandService.cc
+  src/app/core/localipc/ShijimaLocalApiClient.cc
+  src/app/core/localipc/ShijimaLocalApi.cc
   src/app/ui/menus/ShijimaContextMenu.cc
   src/app/ui/menus/ContextMenuActions.cc
   src/app/core/audio/SoundEffectManager.cc
@@ -211,6 +215,17 @@ target_sources(NeurolingsCE PRIVATE
   src/platform/Platform/Platform.hpp
   src/platform/Platform/ActiveWindow.hpp
   src/platform/Platform/ActiveWindowObserver.hpp
+)
+
+target_sources(NeurolingsCECli PRIVATE
+  src/app/cli_main.cc
+  src/app/cli.cc
+  src/app/cli/CommandLineParser.cc
+  src/app/cli/CommandExecutor.cc
+  src/app/cli/OutputFormatter.cc
+  src/app/core/AppLog.cc
+  src/app/core/commands/MascotApi.cc
+  src/app/core/localipc/ShijimaLocalApiClient.cc
 )
 
 if(SHIJIMA_WITH_DEFAULT_MASCOT)
@@ -316,6 +331,12 @@ target_include_directories(NeurolingsCE PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/cpp-httplib
 )
 
+target_include_directories(NeurolingsCECli PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/libshimejifinder
+)
+
 target_compile_definitions(NeurolingsCE PRIVATE
   NEUROLINGSCE_VERSION="${PROJECT_VERSION}"
   APP_NAME="NeurolingsCE"
@@ -323,13 +344,24 @@ target_compile_definitions(NeurolingsCE PRIVATE
   $<$<BOOL:${SHIJIMA_USE_QTMULTIMEDIA}>:SHIJIMA_USE_QTMULTIMEDIA=1>
   $<$<NOT:$<BOOL:${SHIJIMA_USE_QTMULTIMEDIA}>>:SHIJIMA_USE_QTMULTIMEDIA=0>
 )
+target_compile_definitions(NeurolingsCECli PRIVATE
+  NEUROLINGSCE_VERSION="${PROJECT_VERSION}"
+  APP_NAME="NeurolingsCE"
+  APP_DISPLAY_NAME="NeurolingsCE[Shijima-Qt Edition]"
+)
 target_link_libraries(NeurolingsCE PRIVATE
   Qt6::Core
   Qt6::Gui
   Qt6::Widgets
   Qt6::Concurrent
+  Qt6::Network
   NeurolingsShijimaEngine
   ElaWidgetTools
+)
+target_link_libraries(NeurolingsCECli PRIVATE
+  Qt6::Core
+  Qt6::Network
+  shimejifinder
 )
 
 
@@ -356,11 +388,15 @@ if(MSVC)
   # This points PATH at the Qt bin directory (where Qt6Guid.dll lives in Debug).
   set_property(TARGET NeurolingsCE PROPERTY VS_DEBUGGER_ENVIRONMENT
     "PATH=$<TARGET_FILE_DIR:Qt6::Core>\;%PATH%")
+  set_property(TARGET NeurolingsCECli PROPERTY VS_DEBUGGER_ENVIRONMENT
+    "PATH=$<TARGET_FILE_DIR:Qt6::Core>\;%PATH%")
 endif()
 
 target_compile_definitions(NeurolingsCE PRIVATE ELAWIDGETTOOLS_LIBRARY=0)
 
 target_link_libraries(NeurolingsCE PRIVATE shimejifinder)
+
+set_target_properties(NeurolingsCECli PROPERTIES OUTPUT_NAME "NeurolingsCE-cli")
 
 if(SHIJIMA_USE_QTMULTIMEDIA)
   target_link_libraries(NeurolingsCE PRIVATE Qt6::Multimedia)
@@ -368,6 +404,7 @@ endif()
 
 if(WIN32)
   target_compile_definitions(NeurolingsCE PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+  target_compile_definitions(NeurolingsCECli PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
   set_target_properties(NeurolingsCE PROPERTIES WIN32_EXECUTABLE TRUE)
 endif()
 
@@ -395,6 +432,14 @@ if(WIN32)
               --no-system-d3d-compiler
               "$<TARGET_FILE:NeurolingsCE>"
       WORKING_DIRECTORY "$<TARGET_FILE_DIR:NeurolingsCE>"
+      VERBATIM
+    )
+    add_custom_command(TARGET NeurolingsCECli POST_BUILD
+      COMMAND "${QT_WINDEPLOYQT_EXECUTABLE}"
+              --no-translations
+              --no-system-d3d-compiler
+              "$<TARGET_FILE:NeurolingsCECli>"
+      WORKING_DIRECTORY "$<TARGET_FILE_DIR:NeurolingsCECli>"
       VERBATIM
     )
     message(STATUS "windeployqt found; adding post-build command to deploy Qt runtime.")

@@ -10,6 +10,8 @@ SOURCES = src/app/main.cc \
 	src/app/core/assets/AssetLoader.cc \
 	src/app/core/commands/MascotApi.cc \
 	src/app/core/commands/MascotCommandService.cc \
+	src/app/core/localipc/ShijimaLocalApiClient.cc \
+	src/app/core/localipc/ShijimaLocalApi.cc \
 	src/app/ui/menus/ShijimaContextMenu.cc \
 	src/app/ui/menus/ContextMenuActions.cc \
 	src/app/core/audio/SoundEffectManager.cc \
@@ -46,6 +48,17 @@ SOURCES = src/app/main.cc \
 SHIJIMA_ENGINE_SOURCES := $(shell find src/app/core/shijima-engine/shijima -name '*.cc' | sort)
 SOURCES += $(SHIJIMA_ENGINE_SOURCES)
 
+CLI_EXECUTABLE ?= $(APP_NAME)-cli
+CLI_SOURCES = src/app/cli_main.cc \
+	src/app/cli.cc \
+	src/app/cli/CommandLineParser.cc \
+	src/app/cli/CommandExecutor.cc \
+	src/app/cli/OutputFormatter.cc \
+	src/app/core/AppLog.cc \
+	src/app/core/commands/MascotApi.cc \
+	src/app/core/localipc/ShijimaLocalApiClient.cc
+CLI_OBJECTS = $(patsubst %.cc,%.o,$(CLI_SOURCES))
+
 DEFAULT_MASCOT_FILES := $(addsuffix .png,$(addprefix src/assets/DefaultMascot/img/shime,$(shell seq -s ' ' 1 1 46))) \
 	src/assets/DefaultMascot/behaviors.xml src/assets/DefaultMascot/actions.xml
 
@@ -65,7 +78,7 @@ LICENSE_FILES := Shijima-Qt.LICENSE.txt \
 
 LICENSE_FILES := $(addprefix licenses/,$(LICENSE_FILES))
 
-QT_LIBS = Widgets Core Gui Concurrent
+QT_LIBS = Widgets Core Gui Concurrent Network
 
 TARGET_LDFLAGS := -Llibshimejifinder/build/unarr -lunarr
 
@@ -86,7 +99,7 @@ else
 CXXFLAGS += -DSHIJIMA_USE_QTMULTIMEDIA=0
 endif
 
-CXXFLAGS += -Iinclude -Isrc/platform -Isrc/app/core/shijima-engine -Ilibshimejifinder -Icpp-httplib -IElaWidgetTools/ElaWidgetTools -I. -DNEUROLINGSCE_VERSION='"$(NEUROLINGSCE_VERSION)"' -DSHIJIMA_DUK_STATIC_BUILD=1
+CXXFLAGS += -Iinclude -Isrc/platform -Isrc/app/core/shijima-engine -Ilibshimejifinder -Icpp-httplib -IElaWidgetTools/ElaWidgetTools -I. -DNEUROLINGSCE_VERSION='"$(NEUROLINGSCE_VERSION)"' -DAPP_NAME='"$(APP_NAME)"' -DAPP_DISPLAY_NAME='"$(APP_DISPLAY_NAME)"' -DSHIJIMA_DUK_STATIC_BUILD=1
 PKG_LIBS += libarchive
 PUBLISH_DLL = $(addprefix Qt6,$(QT_LIBS))
 
@@ -106,10 +119,11 @@ endef
 
 all:: publish/$(PLATFORM)/$(CONFIG)
 
-publish/Windows/$(CONFIG): shijima-qt$(EXE) FORCE
+publish/Windows/$(CONFIG): shijima-qt$(EXE) $(CLI_EXECUTABLE)$(EXE) FORCE
 	mkdir -p $@
 	@$(call copy_changed,libshimejifinder/build/unarr/libunarr.so.1.1.0,$@)
 	@$(call copy_changed,$<,$@)
+	@$(call copy_changed,$(CLI_EXECUTABLE)$(EXE),$@)
 	@$(call copy_exe_dlls,$<,$@)
 	@$(call copy_qt_plugin_dlls,$@)
 	if [ $(CONFIG) = release ]; then find $@ -name '*.dll' -exec $(STRIP) -S '{}' \;; fi
@@ -136,18 +150,20 @@ linuxdeploy-aarch64.AppImage: linuxdeploy-plugin-qt-aarch64.AppImage linuxdeploy
 linuxdeploy.AppImage: linuxdeploy-aarch64.AppImage linuxdeploy-x86_64.AppImage
 
 
-publish/macOS/$(CONFIG): shijima-qt$(EXE)
+publish/macOS/$(CONFIG): shijima-qt$(EXE) $(CLI_EXECUTABLE)$(EXE)
 	mkdir -p $@
 	$(call copy_changed,libshimejifinder/build/unarr/libunarr.1.dylib,$@)
 	$(call copy_changed,$<,$@)
+	$(call copy_changed,$(CLI_EXECUTABLE)$(EXE),$@)
 	if [ $(CONFIG) = release ]; then $(STRIP) -S $@/libunarr.1.dylib; fi
 	install_name_tool -add_rpath "$$(realpath $@)" $@/shijima-qt
 
-publish/Linux/$(CONFIG): shijima-qt$(EXE)
+publish/Linux/$(CONFIG): shijima-qt$(EXE) $(CLI_EXECUTABLE)$(EXE)
 	mkdir -p $@
 	@$(call copy_changed,libshimejifinder/build/unarr/libunarr.so.1,$@)
 	if [ $(CONFIG) = release ]; then $(STRIP) -S $@/libunarr.so.1; fi
 	@$(call copy_changed,$<,$@)
+	@$(call copy_changed,$(CLI_EXECUTABLE)$(EXE),$@)
 
 publish/macOS/$(CONFIG)/NeurolingsCE.app: publish/macOS/$(CONFIG)
 	rm -rf $@ && [ ! -d $@ ]
@@ -175,6 +191,10 @@ $(APP_EXECUTABLE)$(EXE): src/platform/Platform/Platform.a libshimejifinder/build
 	src/platform/Platform/Linux/gnome_script/metadata.json
 	$(CXX) -o $@ $(LD_COPY_NEEDED) $(LD_WHOLE_ARCHIVE) $^ $(LD_NO_WHOLE_ARCHIVE) \
 		$(TARGET_LDFLAGS) $(LDFLAGS)
+	if [ $(CONFIG) = "release" ]; then $(STRIP) $@; fi
+
+$(CLI_EXECUTABLE)$(EXE): $(CLI_OBJECTS) libshimejifinder/build/libshimejifinder.a
+	$(CXX) -o $@ $^ $(TARGET_LDFLAGS) $(LDFLAGS)
 	if [ $(CONFIG) = "release" ]; then $(STRIP) $@; fi
 
 DefaultMascot.cc: $(DEFAULT_MASCOT_FILES) Makefile src/tools/bundle-default.sh
@@ -257,12 +277,13 @@ ElaWidgetTools/build/ElaWidgetTools/libElaWidgetTools.a: ElaWidgetTools/build/Ma
 
 clean::
 	rm -rf publish/$(PLATFORM)/$(CONFIG) libshimejifinder/build ElaWidgetTools/build
-	rm -f $(OBJECTS) $(APP_EXECUTABLE).a $(APP_EXECUTABLE)$(EXE) $(APP_NAME).AppImage qrc_resources.cc qrc_i18n.cc $(QM_FILES)
+	rm -f $(OBJECTS) $(CLI_OBJECTS) $(APP_EXECUTABLE).a $(APP_EXECUTABLE)$(EXE) $(CLI_EXECUTABLE)$(EXE) $(APP_NAME).AppImage qrc_resources.cc qrc_i18n.cc $(QM_FILES)
 	find src/app -name '*.moc' -delete
 	$(MAKE) -C src/platform/Platform clean
 
 install:
 	install -Dm755 publish/Linux/$(CONFIG)/$(APP_EXECUTABLE) $(PREFIX)/bin/$(APP_EXECUTABLE)
+	install -Dm755 $(CLI_EXECUTABLE) $(PREFIX)/bin/$(CLI_EXECUTABLE)
 	install -Dm755 publish/Linux/$(CONFIG)/libunarr.so.1 $(PREFIX)/lib/libunarr.so.1
 	install -Dm644 src/packaging/io.github.qingchenyouforcc.NeurolingsCE.desktop $(PREFIX)/share/applications/$(APP_BUNDLE_ID).desktop
 	install -Dm644 src/packaging/io.github.qingchenyouforcc.NeurolingsCE.metainfo.xml $(PREFIX)/share/metainfo/$(APP_BUNDLE_ID).metainfo.xml
@@ -275,6 +296,7 @@ install:
 
 uninstall:
 	rm -f $(PREFIX)/bin/$(APP_EXECUTABLE)
+	rm -f $(PREFIX)/bin/$(CLI_EXECUTABLE)
 	rm -f $(PREFIX)/lib/libunarr.so.1
 	rm -f $(PREFIX)/share/applications/$(APP_BUNDLE_ID).desktop
 	rm -f $(PREFIX)/share/metainfo/$(APP_BUNDLE_ID).metainfo.xml

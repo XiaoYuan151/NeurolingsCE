@@ -17,85 +17,181 @@
 //
 
 #include "InternalCli.hpp"
-#include "shijima-qt/AppLog.hpp"
 
-#include <httplib.h>
+#include "shijima-qt/AppLog.hpp"
+#include "shijima-qt/ShijimaLocalApi.hpp"
+
+#include <QCoreApplication>
+#include <QDir>
+#include <QDirIterator>
+#include <QElapsedTimer>
+#include <QFile>
+#include <QFileInfo>
 #include <QJsonArray>
-#include <QJsonDocument>
 #include <QJsonObject>
+#include <QProcess>
 #include <QRandomGenerator>
+#include <QStandardPaths>
+#include <QThread>
 
 #include <algorithm>
+#include <exception>
+#include <map>
+
+#include <shimejifinder/analyze.hpp>
 
 namespace {
 
 CliError makeError(QString const& code, QString const& message, int exitCode = 1,
-    int httpStatus = 0, QString const& details = {})
+    int status = 0, QString const& details = {})
 {
     CliError error;
     error.code = code;
     error.error = message;
     error.details = details;
     error.exitCode = exitCode;
-    error.httpStatus = httpStatus;
+    error.httpStatus = status;
     return error;
 }
 
-void configureClient(httplib::Client &client, CliGlobalOptions const& global) {
-    client.set_connection_timeout(global.connectTimeoutMs / 1000,
-        (global.connectTimeoutMs % 1000) * 1000);
-    client.set_read_timeout(global.readTimeoutMs / 1000,
-        (global.readTimeoutMs % 1000) * 1000);
+ShijimaLocalApiClientOptions localApiOptions(CliGlobalOptions const& global) {
+    ShijimaLocalApiClientOptions options;
+    options.connectTimeoutMs = global.connectTimeoutMs;
+    options.readTimeoutMs = global.readTimeoutMs;
+    return options;
 }
 
-QJsonObject patchToJson(MascotPatch const& patch) {
-    QJsonObject object;
-    if (patch.hasCompleteAnchor()) {
-        QJsonObject anchor;
-        anchor["x"] = patch.anchorX.value();
-        anchor["y"] = patch.anchorY.value();
-        object["anchor"] = anchor;
-    }
-    if (patch.behavior.has_value()) {
-        object["behavior"] = patch.behavior.value();
-    }
-    return object;
+ShijimaLocalApiClientOptions startupRequestOptions(CliGlobalOptions const& global) {
+    ShijimaLocalApiClientOptions options = localApiOptions(global);
+    options.connectTimeoutMs = std::max(options.connectTimeoutMs, 1000);
+    options.readTimeoutMs = std::max(options.readTimeoutMs, 5000);
+    return options;
 }
 
-QJsonObject spawnRequestToJson(SpawnMascotRequest const& request) {
-    QJsonObject object = patchToJson(request.patch);
-    if (request.name.has_value()) {
-        object["name"] = request.name.value();
+QStringList runtimeExecutableCandidates() {
+    QString executableSuffix;
+#ifdef _WIN32
+    executableSuffix = QStringLiteral(".exe");
+#endif
+    QStringList names {
+        QStringLiteral(APP_NAME),
+        QStringLiteral("NeurolingsCE"),
+        QStringLiteral("shijima-qt"),
+    };
+    names.removeDuplicates();
+
+    QStringList candidates;
+    QString appDir = QCoreApplication::applicationDirPath();
+    for (auto const& name : names) {
+        QString fileName = name;
+        if (!executableSuffix.isEmpty() &&
+            !fileName.endsWith(executableSuffix, Qt::CaseInsensitive))
+        {
+            fileName += executableSuffix;
+        }
+        candidates.append(QDir(appDir).absoluteFilePath(fileName));
     }
-    if (request.dataId.has_value()) {
-        object["data_id"] = request.dataId.value();
-    }
-    return object;
+    return candidates;
 }
 
-bool parseJsonObject(httplib::Result const& res, QJsonObject &object,
-    CliError &error)
+bool findRuntimeExecutable(QString &path, CliError &error) {
+    auto cliPath = QFileInfo { QCoreApplication::applicationFilePath() }
+        .canonicalFilePath();
+    for (auto const& candidate : runtimeExecutableCandidates()) {
+        QFileInfo info { candidate };
+        if (!info.exists() || !info.isFile() || !info.isExecutable()) {
+            continue;
+        }
+        if (info.canonicalFilePath() == cliPath) {
+            continue;
+        }
+        path = info.absoluteFilePath();
+        return true;
+    }
+
+    error = makeError(QStringLiteral("runtime_not_found"),
+        QStringLiteral("Could not find the NeurolingsCE runtime executable next to the CLI"),
+        1, 0, runtimeExecutableCandidates().join(QStringLiteral("; ")));
+    return false;
+}
+
+bool waitForRuntime(CliGlobalOptions const& global, int timeoutMs) {
+    ShijimaLocalApiClientOptions options = localApiOptions(global);
+    options.connectTimeoutMs = std::min(options.connectTimeoutMs, 250);
+    options.readTimeoutMs = std::min(options.readTimeoutMs, 500);
+
+    QElapsedTimer timer;
+    timer.start();
+    while (timer.elapsed() <= timeoutMs) {
+        if (shijimaLocalApiPing(options)) {
+            return true;
+        }
+        QThread::msleep(100);
+    }
+    return false;
+}
+
+bool ensureRuntimeStarted(CliCommand const& command, CliError &error) {
+    if (waitForRuntime(command.global, 0)) {
+        return true;
+    }
+
+    QString runtimePath;
+    if (!findRuntimeExecutable(runtimePath, error)) {
+        return false;
+    }
+
+    APP_LOG_INFO("cli") << "Starting NeurolingsCE runtime path=\""
+        << runtimePath.toStdString() << "\"";
+    if (!QProcess::startDetached(runtimePath,
+        QStringList { QStringLiteral("--neurolingsce-cli-runtime") },
+        QFileInfo(runtimePath).absolutePath()))
+    {
+        error = makeError(QStringLiteral("runtime_start_failed"),
+            QStringLiteral("Could not start the NeurolingsCE runtime executable"),
+            1, 0, runtimePath);
+        return false;
+    }
+
+    int startupTimeoutMs = std::max(10000,
+        command.global.connectTimeoutMs + command.global.readTimeoutMs);
+    if (!waitForRuntime(command.global, startupTimeoutMs)) {
+        error = makeError(QStringLiteral("runtime_start_timeout"),
+            QStringLiteral("NeurolingsCE runtime was started but did not become ready"),
+            1, 0, runtimePath);
+        return false;
+    }
+    return true;
+}
+
+bool sendRequest(CliCommand const& command, QJsonObject const& requestObject,
+    QJsonObject &responseObject, CliError &error)
 {
-    if (res == nullptr) {
-        error = makeError(QStringLiteral("not_running"),
-            QStringLiteral("Request failed. Is NeurolingsCE running?"));
+    QString transportError;
+    bool requestOk = shijimaLocalApiRequest(requestObject, responseObject,
+        transportError, localApiOptions(command.global));
+    if (!requestOk) {
+        if (!shijimaLocalApiPing(localApiOptions(command.global))) {
+            if (!ensureRuntimeStarted(command, error)) {
+                return false;
+            }
+            transportError.clear();
+            requestOk = shijimaLocalApiRequest(requestObject, responseObject,
+                transportError, startupRequestOptions(command.global));
+        }
+    }
+    if (!requestOk) {
+        if (transportError.isEmpty()) {
+            transportError = QStringLiteral("NeurolingsCE runtime did not respond to the CLI request");
+        }
+        error = makeError(QStringLiteral("transport_error"), transportError);
         return false;
     }
-    QByteArray bytes(res->body.data(), (qsizetype)res->body.size());
-    QJsonParseError parseError;
-    auto document = QJsonDocument::fromJson(bytes, &parseError);
-    if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
-        error = makeError(QStringLiteral("invalid_response"),
-            QStringLiteral("Failed to parse response from HTTP API"), 1,
-            res->status, parseError.errorString());
-        return false;
-    }
-    object = document.object();
-    if (res->status >= 400 || object.contains("error")) {
+    if (responseObject.contains("error")) {
         error = makeError(
-            object.value("code").toString(QStringLiteral("api_error")),
-            object.value("error").toString(QStringLiteral("API request failed")),
-            1, res->status);
+            responseObject.value("code").toString(QStringLiteral("ipc_error")),
+            responseObject.value("error").toString(QStringLiteral("IPC request failed")),
+            1, responseObject.value("status").toInt());
         return false;
     }
     return true;
@@ -107,7 +203,7 @@ bool parseMascotArray(QJsonObject const& object, char const *key,
     auto value = object.value(key);
     if (!value.isArray()) {
         error = makeError(QStringLiteral("invalid_response"),
-            QStringLiteral("Malformed response from HTTP API"));
+            QStringLiteral("Malformed response from local IPC"));
         return false;
     }
     for (auto const& item : value.toArray()) {
@@ -129,7 +225,7 @@ bool parseLoadedMascotArray(QJsonObject const& object, char const *key,
     auto value = object.value(key);
     if (!value.isArray()) {
         error = makeError(QStringLiteral("invalid_response"),
-            QStringLiteral("Malformed response from HTTP API"));
+            QStringLiteral("Malformed response from local IPC"));
         return false;
     }
     for (auto const& item : value.toArray()) {
@@ -158,6 +254,18 @@ bool parseMascotObject(QJsonObject const& object, char const *key,
     return true;
 }
 
+bool parseCliLabelObject(QJsonObject const& object, CliLabelInfo &labelInfo,
+    CliError &error)
+{
+    QString parseError;
+    if (!cliLabelInfoFromJson(object, labelInfo, &parseError)) {
+        error = makeError(QStringLiteral("invalid_response"),
+            QStringLiteral("Malformed CLI label payload"), 1, 0, parseError);
+        return false;
+    }
+    return true;
+}
+
 QString chooseBehavior(QStringList const& behaviors) {
     if (behaviors.isEmpty()) {
         return {};
@@ -166,8 +274,257 @@ QString chooseBehavior(QStringList const& behaviors) {
     return behaviors[index];
 }
 
-bool resolveMascotId(httplib::Client &client, CliCommand const& command,
-    int &mascotId, CliError &error)
+QString mascotStoragePath() {
+    QString dataPath =
+        QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+    if (dataPath.isEmpty()) {
+        return {};
+    }
+    return QDir::cleanPath(dataPath + QDir::separator() + QStringLiteral("mascots"));
+}
+
+bool ensureMascotStorage(QString &storagePath, CliError &error) {
+    storagePath = mascotStoragePath();
+    if (storagePath.isEmpty()) {
+        error = makeError(QStringLiteral("storage_unavailable"),
+            QStringLiteral("Could not determine mascot storage directory"));
+        return false;
+    }
+
+    QDir dir { storagePath };
+    if (!dir.exists() && !dir.mkpath(QStringLiteral("."))) {
+        error = makeError(QStringLiteral("storage_unavailable"),
+            QStringLiteral("Could not create mascot storage directory"), 1, 0,
+            storagePath);
+        return false;
+    }
+
+    if (QFile readme { dir.absoluteFilePath(QStringLiteral("README.txt")) };
+        readme.open(QFile::WriteOnly | QFile::NewOnly | QFile::Text))
+    {
+        readme.write(""
+"Manually importing shimeji by copying its contents into this folder may\n"
+"cause problems. Prefer NeurolingsCE-cli --mascot add <zip> or the GUI import\n"
+"dialog unless you have a good reason not to.\n"
+        );
+    }
+    return true;
+}
+
+QString normalizeMascotTemplateName(QString name) {
+    name = name.trimmed();
+    if (name.endsWith(QStringLiteral(".mascot"), Qt::CaseInsensitive)) {
+        name.chop(7);
+    }
+    return name;
+}
+
+bool hasPathSeparator(QString const& value) {
+    return value.contains(QLatin1Char('/')) ||
+        value.contains(QLatin1Char('\\')) ||
+        value == QStringLiteral(".") ||
+        value == QStringLiteral("..");
+}
+
+bool listStandaloneLoadedMascots(QList<LoadedMascotInfo> &mascots,
+    CliError &error)
+{
+    QString storagePath;
+    if (!ensureMascotStorage(storagePath, error)) {
+        return false;
+    }
+
+    mascots.clear();
+    mascots.append(LoadedMascotInfo { 0, QStringLiteral("Default Mascot") });
+
+    QStringList names;
+    QDirIterator iter { storagePath, QDir::Dirs | QDir::NoDotAndDotDot,
+        QDirIterator::NoIteratorFlags };
+    while (iter.hasNext()) {
+        QFileInfo entry = iter.nextFileInfo();
+        QString dirname = entry.fileName();
+        if (!dirname.endsWith(QStringLiteral(".mascot"), Qt::CaseInsensitive) ||
+            dirname.length() <= 7)
+        {
+            continue;
+        }
+        names.append(dirname.sliced(0, dirname.length() - 7));
+    }
+    names.sort(Qt::CaseInsensitive);
+
+    int id = 1;
+    for (auto const& name : names) {
+        mascots.append(LoadedMascotInfo { id++, name });
+    }
+    return true;
+}
+
+bool importStandaloneMascotTemplate(QString const& archivePath,
+    QList<LoadedMascotInfo> &importedMascots, CliError &error)
+{
+    QFileInfo archiveInfo { archivePath };
+    if (!archiveInfo.exists() || !archiveInfo.isFile()) {
+        error = makeError(QStringLiteral("invalid_arguments"),
+            QStringLiteral("Mascot archive does not exist"), 2, 0, archivePath);
+        return false;
+    }
+
+    QString storagePath;
+    if (!ensureMascotStorage(storagePath, error)) {
+        return false;
+    }
+
+    std::set<std::string> changed;
+    try {
+        auto archive = shimejifinder::analyze(archiveInfo.absoluteFilePath().toStdString());
+        if (!archive) {
+            error = makeError(QStringLiteral("import_failed"),
+                QStringLiteral("Could not analyze mascot archive"), 1, 0,
+                archiveInfo.absoluteFilePath());
+            return false;
+        }
+        archive->extract(storagePath.toStdString());
+        changed = archive->shimejis();
+    }
+    catch (std::exception const& ex) {
+        error = makeError(QStringLiteral("import_failed"),
+            QStringLiteral("Could not import mascot archive"), 1, 0,
+            QString::fromUtf8(ex.what()));
+        return false;
+    }
+
+    if (changed.empty()) {
+        error = makeError(QStringLiteral("import_failed"),
+            QStringLiteral("Could not import any mascots from the specified archive"));
+        return false;
+    }
+
+    QList<LoadedMascotInfo> allMascots;
+    if (!listStandaloneLoadedMascots(allMascots, error)) {
+        return false;
+    }
+
+    std::map<QString, LoadedMascotInfo> byName;
+    for (auto const& mascot : allMascots) {
+        byName[mascot.name] = mascot;
+    }
+
+    importedMascots.clear();
+    for (auto const& name : changed) {
+        auto qName = QString::fromStdString(name);
+        auto it = byName.find(qName);
+        if (it != byName.end()) {
+            importedMascots.append(it->second);
+        }
+        else {
+            importedMascots.append(LoadedMascotInfo { -1, qName });
+        }
+    }
+    return true;
+}
+
+bool removeStandaloneMascotTemplate(QString const& requestedName,
+    QString &removedName, CliError &error)
+{
+    QString name = normalizeMascotTemplateName(requestedName);
+    if (name.isEmpty() || hasPathSeparator(name)) {
+        error = makeError(QStringLiteral("invalid_arguments"),
+            QStringLiteral("Mascot template name must be a plain template name"),
+            2);
+        return false;
+    }
+    if (name == QStringLiteral("Default Mascot")) {
+        error = makeError(QStringLiteral("mascot_template_not_deletable"),
+            QStringLiteral("Mascot template cannot be deleted"));
+        return false;
+    }
+
+    QString storagePath;
+    if (!ensureMascotStorage(storagePath, error)) {
+        return false;
+    }
+
+    QDir storageDir { storagePath };
+    QFileInfo storageInfo { storagePath };
+    QFileInfo targetInfo {
+        storageDir.absoluteFilePath(name + QStringLiteral(".mascot"))
+    };
+    if (!targetInfo.exists() || !targetInfo.isDir()) {
+        error = makeError(QStringLiteral("mascot_template_not_found"),
+            QStringLiteral("No such mascot template"));
+        return false;
+    }
+
+    QString storageCanonical = storageInfo.canonicalFilePath();
+    QString targetCanonical = targetInfo.canonicalFilePath();
+    QString storagePrefix = QDir::cleanPath(storageCanonical) + QDir::separator();
+    if (storageCanonical.isEmpty() || targetCanonical.isEmpty() ||
+        !QDir::cleanPath(targetCanonical).startsWith(storagePrefix))
+    {
+        error = makeError(QStringLiteral("invalid_template_path"),
+            QStringLiteral("Refusing to delete a mascot outside the storage directory"));
+        return false;
+    }
+
+    QDir targetDir { targetCanonical };
+    if (!targetDir.removeRecursively()) {
+        error = makeError(QStringLiteral("remove_failed"),
+            QStringLiteral("Could not remove mascot template"), 1, 0,
+            targetCanonical);
+        return false;
+    }
+
+    removedName = name;
+    return true;
+}
+
+bool listLoadedMascots(CliCommand const& command,
+    QList<LoadedMascotInfo> &mascots, CliError &error)
+{
+    QJsonObject object;
+    if (!sendRequest(command, QJsonObject {
+        { QStringLiteral("command"), QStringLiteral("list_loaded_mascots") },
+    }, object, error))
+    {
+        return false;
+    }
+    return parseLoadedMascotArray(object, "loaded_mascots", mascots, error);
+}
+
+bool registerCliLabel(CliCommand const& command, int mascotId,
+    std::optional<int> preferredLabel, CliLabelInfo &labelInfo,
+    CliError &error)
+{
+    QJsonObject requestObject {
+        { QStringLiteral("command"), QStringLiteral("register_cli_label") },
+        { QStringLiteral("mascot_id"), mascotId },
+    };
+    if (preferredLabel.has_value()) {
+        requestObject[QStringLiteral("label")] = preferredLabel.value();
+    }
+    QJsonObject object;
+    if (!sendRequest(command, requestObject, object, error)) {
+        return false;
+    }
+    return parseCliLabelObject(object, labelInfo, error);
+}
+
+bool resolveCliLabel(CliCommand const& command, int cliLabel,
+    CliLabelInfo &labelInfo, CliError &error)
+{
+    QJsonObject object;
+    if (!sendRequest(command, QJsonObject {
+        { QStringLiteral("command"), QStringLiteral("get_cli_label") },
+        { QStringLiteral("label"), cliLabel },
+    }, object, error))
+    {
+        return false;
+    }
+    return parseCliLabelObject(object, labelInfo, error);
+}
+
+bool resolveMascotId(CliCommand const& command, int &mascotId,
+    CliError &error)
 {
     bool ok = false;
     int parsedId = command.idToken.toInt(&ok);
@@ -207,13 +564,14 @@ bool resolveMascotId(httplib::Client &client, CliCommand const& command,
     }
 
     for (auto const& selector : selectors) {
-        httplib::Params params;
+        QJsonObject requestObject {
+            { QStringLiteral("command"), QStringLiteral("list_mascots") },
+        };
         if (!selector.isEmpty()) {
-            params.insert({ "selector", selector.toStdString() });
+            requestObject[QStringLiteral("selector")] = selector;
         }
-        auto res = client.Get("/shijima/api/v1/mascots", params, {});
         QJsonObject object;
-        if (!parseJsonObject(res, object, error)) {
+        if (!sendRequest(command, requestObject, object, error)) {
             return false;
         }
         QList<MascotInfo> mascots;
@@ -244,8 +602,12 @@ bool resolveMascotId(httplib::Client &client, CliCommand const& command,
 
 CliExecutionResult executeCliCommand(CliCommand const& command) {
     CliExecutionResult result;
-    httplib::Client client(command.global.host.toStdString(), command.global.port);
-    configureClient(client, command.global);
+
+    if (command.kind == CliCommandKind::Help ||
+        command.kind == CliCommandKind::Version)
+    {
+        return result;
+    }
 
     auto fail = [&](CliError const& error) {
         result.error = error;
@@ -256,15 +618,42 @@ CliExecutionResult executeCliCommand(CliCommand const& command) {
         return result;
     };
 
-    if (command.kind == CliCommandKind::ListMascots) {
-        httplib::Params params;
-        if (!command.selector.isEmpty()) {
-            params.insert({ "selector", command.selector.toStdString() });
+    if (command.kind == CliCommandKind::DocumentStop) {
+        QJsonObject object;
+        QString transportError;
+        bool requestOk = shijimaLocalApiRequest(QJsonObject {
+            { QStringLiteral("command"), QStringLiteral("stop_runtime") },
+        }, object, transportError, localApiOptions(command.global));
+        if (!requestOk) {
+            if (!shijimaLocalApiPing(localApiOptions(command.global))) {
+                return result;
+            }
+            return fail(makeError(QStringLiteral("transport_error"),
+                transportError.isEmpty()
+                    ? QStringLiteral("NeurolingsCE runtime did not respond to the CLI request")
+                    : transportError));
         }
-        auto res = client.Get("/shijima/api/v1/mascots", params, {});
+        if (object.contains(QStringLiteral("error"))) {
+            return fail(makeError(
+                object.value(QStringLiteral("code")).toString(QStringLiteral("ipc_error")),
+                object.value(QStringLiteral("error")).toString(QStringLiteral("IPC request failed")),
+                1, object.value(QStringLiteral("status")).toInt()));
+        }
+        return result;
+    }
+
+    if (command.kind == CliCommandKind::DocumentList ||
+        command.kind == CliCommandKind::ListMascots)
+    {
+        QJsonObject requestObject {
+            { QStringLiteral("command"), QStringLiteral("list_mascots") },
+        };
+        if (!command.selector.isEmpty()) {
+            requestObject[QStringLiteral("selector")] = command.selector;
+        }
         QJsonObject object;
         CliError error;
-        if (!parseJsonObject(res, object, error)) {
+        if (!sendRequest(command, requestObject, object, error)) {
             return fail(error);
         }
         if (!parseMascotArray(object, "mascots", result.mascots, error)) {
@@ -274,39 +663,84 @@ CliExecutionResult executeCliCommand(CliCommand const& command) {
     }
 
     if (command.kind == CliCommandKind::ListLoadedMascots) {
-        auto res = client.Get("/shijima/api/v1/loadedMascots");
-        QJsonObject object;
         CliError error;
-        if (!parseJsonObject(res, object, error)) {
-            return fail(error);
-        }
-        if (!parseLoadedMascotArray(object, "loaded_mascots",
-            result.loadedMascots, error))
-        {
+        if (!listLoadedMascots(command, result.loadedMascots, error)) {
             return fail(error);
         }
         return result;
     }
 
-    if (command.kind == CliCommandKind::SpawnMascot) {
+    if (command.kind == CliCommandKind::DocumentMascot) {
+        CliError error;
+        if (command.mascotAction == QStringLiteral("list")) {
+            if (!listStandaloneLoadedMascots(result.loadedMascots, error)) {
+                return fail(error);
+            }
+            return result;
+        }
+
+        if (command.mascotAction == QStringLiteral("add")) {
+            if (!importStandaloneMascotTemplate(command.mascotArchivePath,
+                result.loadedMascots, error))
+            {
+                return fail(error);
+            }
+        }
+        else {
+            if (!removeStandaloneMascotTemplate(command.mascotTemplateName,
+                result.removedTemplateName, error))
+            {
+                return fail(error);
+            }
+        }
+        return result;
+    }
+
+    if (command.kind == CliCommandKind::DocumentSummon ||
+        command.kind == CliCommandKind::SpawnMascot)
+    {
         SpawnMascotRequest request = command.spawnRequest;
+        CliError error;
+
+        if (command.kind == CliCommandKind::DocumentSummon &&
+            command.summonMode == QStringLiteral("random"))
+        {
+            QList<LoadedMascotInfo> loadedMascots;
+            if (!listLoadedMascots(command, loadedMascots, error)) {
+                return fail(error);
+            }
+            if (loadedMascots.isEmpty()) {
+                return fail(makeError(QStringLiteral("not_found"),
+                    QStringLiteral("No loaded mascots are available")));
+            }
+            int index = QRandomGenerator::global()->bounded(0, loadedMascots.size());
+            request.dataId = loadedMascots[index].id;
+            request.name.reset();
+        }
+
         auto behavior = chooseBehavior(command.behaviors);
         if (!behavior.isEmpty()) {
             request.patch.behavior = behavior;
         }
-        QJsonDocument document(spawnRequestToJson(request));
-        auto json = document.toJson(QJsonDocument::Compact);
-        auto res = client.Post("/shijima/api/v1/mascots",
-            std::string(json.constData(), (size_t)json.size()),
-            "application/json");
+
         QJsonObject object;
-        CliError error;
-        if (!parseJsonObject(res, object, error)) {
+        if (!sendRequest(command, QJsonObject {
+            { QStringLiteral("command"), QStringLiteral("spawn_mascot") },
+            { QStringLiteral("request"), spawnMascotRequestToJson(request) },
+        }, object, error))
+        {
             return fail(error);
         }
         MascotInfo mascot;
         if (!parseMascotObject(object, "mascot", mascot, error)) {
             return fail(error);
+        }
+        if (command.kind == CliCommandKind::DocumentSummon) {
+            CliLabelInfo labelInfo;
+            if (!registerCliLabel(command, mascot.id, command.cliLabel, labelInfo, error)) {
+                return fail(error);
+            }
+            mascot.cliLabel = labelInfo.label;
         }
         result.mascot = mascot;
         return result;
@@ -315,7 +749,7 @@ CliExecutionResult executeCliCommand(CliCommand const& command) {
     if (command.kind == CliCommandKind::AlterMascot) {
         CliError error;
         int mascotId = -1;
-        if (!resolveMascotId(client, command, mascotId, error)) {
+        if (!resolveMascotId(command, mascotId, error)) {
             return fail(error);
         }
         MascotPatch patch = command.patch;
@@ -323,13 +757,13 @@ CliExecutionResult executeCliCommand(CliCommand const& command) {
         if (!behavior.isEmpty()) {
             patch.behavior = behavior;
         }
-        QJsonDocument document(patchToJson(patch));
-        auto json = document.toJson(QJsonDocument::Compact);
-        auto res = client.Put("/shijima/api/v1/mascots/" + std::to_string(mascotId),
-            std::string(json.constData(), (size_t)json.size()),
-            "application/json");
         QJsonObject object;
-        if (!parseJsonObject(res, object, error)) {
+        if (!sendRequest(command, QJsonObject {
+            { QStringLiteral("command"), QStringLiteral("alter_mascot") },
+            { QStringLiteral("mascot_id"), mascotId },
+            { QStringLiteral("patch"), mascotPatchToJson(patch) },
+        }, object, error))
+        {
             return fail(error);
         }
         MascotInfo mascot;
@@ -340,31 +774,49 @@ CliExecutionResult executeCliCommand(CliCommand const& command) {
         return result;
     }
 
-    if (command.kind == CliCommandKind::DismissMascot) {
+    if (command.kind == CliCommandKind::DocumentClose) {
         CliError error;
-        int mascotId = -1;
-        if (!resolveMascotId(client, command, mascotId, error)) {
+        CliLabelInfo labelInfo;
+        if (!resolveCliLabel(command, command.cliLabel.value(), labelInfo, error)) {
             return fail(error);
         }
-        auto res = client.Delete("/shijima/api/v1/mascots/" + std::to_string(mascotId));
         QJsonObject object;
-        if (!parseJsonObject(res, object, error)) {
+        if (!sendRequest(command, QJsonObject {
+            { QStringLiteral("command"), QStringLiteral("dismiss_mascot") },
+            { QStringLiteral("mascot_id"), labelInfo.mascotId },
+        }, object, error))
+        {
             return fail(error);
         }
         return result;
     }
 
-    QJsonObject requestObject;
-    if (!command.selector.isEmpty()) {
-        requestObject["selector"] = command.selector;
+    if (command.kind == CliCommandKind::DismissMascot) {
+        CliError error;
+        int mascotId = -1;
+        if (!resolveMascotId(command, mascotId, error)) {
+            return fail(error);
+        }
+        QJsonObject object;
+        if (!sendRequest(command, QJsonObject {
+            { QStringLiteral("command"), QStringLiteral("dismiss_mascot") },
+            { QStringLiteral("mascot_id"), mascotId },
+        }, object, error))
+        {
+            return fail(error);
+        }
+        return result;
     }
-    QJsonDocument document(requestObject);
-    auto json = document.toJson(QJsonDocument::Compact);
-    auto res = client.Delete("/shijima/api/v1/mascots",
-        std::string(json.constData(), (size_t)json.size()), "application/json");
+
+    QJsonObject requestObject {
+        { QStringLiteral("command"), QStringLiteral("dismiss_all_mascots") },
+    };
+    if (!command.selector.isEmpty()) {
+        requestObject[QStringLiteral("selector")] = command.selector;
+    }
     QJsonObject object;
     CliError error;
-    if (!parseJsonObject(res, object, error)) {
+    if (!sendRequest(command, requestObject, object, error)) {
         return fail(error);
     }
     return result;

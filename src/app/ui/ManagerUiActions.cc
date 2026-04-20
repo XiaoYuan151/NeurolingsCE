@@ -289,6 +289,7 @@ void ShijimaManager::switchLanguage(const QString &langCode) {
             tr("Language Changed"),
             tr("The application will restart to apply the new language."));
 
+        m_localApi.stop();
         m_httpApi.stop();
 
         const QString program = QCoreApplication::applicationFilePath();

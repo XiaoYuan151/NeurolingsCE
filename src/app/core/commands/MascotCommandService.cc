@@ -23,6 +23,7 @@
 #include "shijima-qt/ui/mascot/ShijimaWidget.hpp"
 #include <QBuffer>
 #include <QByteArray>
+#include <QMetaObject>
 
 namespace {
 
@@ -37,6 +38,13 @@ MascotInfo buildMascotInfo(ShijimaWidget *widget) {
     if (activeBehavior != nullptr) {
         info.activeBehavior = QString::fromStdString(activeBehavior->name);
     }
+    return info;
+}
+
+CliLabelInfo buildCliLabelInfo(int label, int mascotId) {
+    CliLabelInfo info;
+    info.label = label;
+    info.mascotId = mascotId;
     return info;
 }
 
@@ -107,6 +115,18 @@ MascotCommandStatus loadedMascotNotFoundStatus() {
         QStringLiteral("No such loaded mascot"));
 }
 
+MascotCommandStatus mascotTemplateNotFoundStatus() {
+    return MascotCommandStatus::failure(404,
+        QStringLiteral("mascot_template_not_found"),
+        QStringLiteral("No such mascot template"));
+}
+
+MascotCommandStatus cliLabelNotFoundStatus() {
+    return MascotCommandStatus::failure(404,
+        QStringLiteral("cli_label_not_found"),
+        QStringLiteral("No such CLI label"));
+}
+
 }
 
 MascotCommandService::MascotCommandService(ShijimaManager *manager):
@@ -121,7 +141,9 @@ MascotCommandStatus MascotCommandService::listMascots(
             if (!selectorEval(mascot, request.selector)) {
                 continue;
             }
-            out.append(buildMascotInfo(mascot));
+            auto info = buildMascotInfo(mascot);
+            info.cliLabel = manager->cliLabelForMascot(info.id);
+            out.append(info);
         }
     });
     return MascotCommandStatus::success();
@@ -140,8 +162,57 @@ MascotCommandStatus MascotCommandService::spawnMascot(
             return;
         }
         auto widget = manager->spawn(mascotName.toStdString());
+        if (widget == nullptr) {
+            status = MascotCommandStatus::failure(500,
+                QStringLiteral("spawn_failed"),
+                QStringLiteral("Failed to spawn mascot"));
+            return;
+        }
         applyPatchToWidget(request.patch, widget);
         out = buildMascotInfo(widget);
+        out.cliLabel = manager->cliLabelForMascot(out.id);
+    });
+    return status;
+}
+
+MascotCommandStatus MascotCommandService::registerCliLabel(
+    RegisterCliLabelRequest const& request, CliLabelInfo &out) const
+{
+    auto status = MascotCommandStatus::success();
+    m_manager->onTickSync([&status, &request, &out](ShijimaManager *manager) {
+        QString errorMessage;
+        int assignedLabel = -1;
+        if (!manager->assignCliLabel(request.mascotId, request.label,
+            assignedLabel, errorMessage))
+        {
+            int httpStatus = 400;
+            QString code = QStringLiteral("invalid_cli_label");
+            if (errorMessage == QStringLiteral("No such mascot")) {
+                status = mascotNotFoundStatus();
+                return;
+            }
+            if (errorMessage == QStringLiteral("CLI label is already in use")) {
+                code = QStringLiteral("cli_label_conflict");
+            }
+            status = MascotCommandStatus::failure(httpStatus, code, errorMessage);
+            return;
+        }
+        out = buildCliLabelInfo(assignedLabel, request.mascotId);
+    });
+    return status;
+}
+
+MascotCommandStatus MascotCommandService::getCliLabel(int cliLabel,
+    CliLabelInfo &out) const
+{
+    auto status = MascotCommandStatus::success();
+    m_manager->onTickSync([&status, cliLabel, &out](ShijimaManager *manager) {
+        auto mascotId = manager->mascotIdForCliLabel(cliLabel);
+        if (!mascotId.has_value()) {
+            status = cliLabelNotFoundStatus();
+            return;
+        }
+        out = buildCliLabelInfo(cliLabel, mascotId.value());
     });
     return status;
 }
@@ -158,6 +229,7 @@ MascotCommandStatus MascotCommandService::alterMascot(int mascotId,
         auto widget = manager->mascotsById().at(mascotId);
         applyPatchToWidget(patch, widget);
         out = buildMascotInfo(widget);
+        out.cliLabel = manager->cliLabelForMascot(mascotId);
     });
     return status;
 }
@@ -172,6 +244,7 @@ MascotCommandStatus MascotCommandService::getMascot(int mascotId,
             return;
         }
         out = buildMascotInfo(manager->mascotsById().at(mascotId));
+        out.cliLabel = manager->cliLabelForMascot(mascotId);
     });
     return status;
 }
@@ -183,6 +256,7 @@ MascotCommandStatus MascotCommandService::dismissMascot(int mascotId) const {
             status = mascotNotFoundStatus();
             return;
         }
+        manager->clearCliLabelForMascot(mascotId);
         manager->mascotsById().at(mascotId)->markForDeletion();
     });
     return status;
@@ -196,7 +270,11 @@ MascotCommandStatus MascotCommandService::dismissAllMascots(
             if (!selectorEval(mascot, request.selector)) {
                 continue;
             }
+            manager->clearCliLabelForMascot(mascot->mascotId());
             mascot->markForDeletion();
+        }
+        if (request.selector.isEmpty()) {
+            manager->clearCliLabels();
         }
     });
     return MascotCommandStatus::success();
@@ -211,6 +289,78 @@ MascotCommandStatus MascotCommandService::listLoadedMascots(
             out.append(buildLoadedMascotInfo(mascot));
         }
     });
+    return MascotCommandStatus::success();
+}
+
+MascotCommandStatus MascotCommandService::importMascotTemplate(
+    QString const& archivePath, QList<LoadedMascotInfo> &out) const
+{
+    out.clear();
+    if (archivePath.isEmpty()) {
+        return MascotCommandStatus::failure(400,
+            QStringLiteral("invalid_archive"),
+            QStringLiteral("Archive path is required"));
+    }
+
+    auto changed = m_manager->import(archivePath);
+    if (changed.empty()) {
+        return MascotCommandStatus::failure(400,
+            QStringLiteral("import_failed"),
+            QStringLiteral("Could not import any mascots from the specified archive"));
+    }
+
+    m_manager->onTickSync([&out, &changed](ShijimaManager *manager) {
+        manager->reloadMascots(changed);
+        for (auto const& mascotName : changed) {
+            auto name = QString::fromStdString(mascotName);
+            if (!manager->loadedMascots().contains(name)) {
+                continue;
+            }
+            out.append(buildLoadedMascotInfo(manager->loadedMascots()[name]));
+        }
+    });
+
+    if (out.isEmpty()) {
+        return MascotCommandStatus::failure(500,
+            QStringLiteral("import_failed"),
+            QStringLiteral("Imported mascot archive but no templates were loaded"));
+    }
+    return MascotCommandStatus::success();
+}
+
+MascotCommandStatus MascotCommandService::removeMascotTemplate(
+    QString const& mascotName) const
+{
+    if (mascotName.isEmpty()) {
+        return MascotCommandStatus::failure(400,
+            QStringLiteral("invalid_mascot_template"),
+            QStringLiteral("Mascot template name is required"));
+    }
+
+    auto status = MascotCommandStatus::success();
+    m_manager->onTickSync([&status, &mascotName](ShijimaManager *manager) {
+        QString errorMessage;
+        if (manager->removeMascotTemplate(mascotName, errorMessage)) {
+            return;
+        }
+        if (errorMessage == QStringLiteral("No such mascot template")) {
+            status = mascotTemplateNotFoundStatus();
+            return;
+        }
+        QString code = QStringLiteral("remove_failed");
+        int httpStatus = 400;
+        if (errorMessage == QStringLiteral("Mascot template cannot be deleted")) {
+            code = QStringLiteral("mascot_template_not_deletable");
+        }
+        status = MascotCommandStatus::failure(httpStatus, code, errorMessage);
+    });
+    return status;
+}
+
+MascotCommandStatus MascotCommandService::stopRuntime() const {
+    QMetaObject::invokeMethod(m_manager, [manager = m_manager]() {
+        manager->quitAction();
+    }, Qt::QueuedConnection);
     return MascotCommandStatus::success();
 }
 

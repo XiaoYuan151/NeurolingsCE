@@ -30,6 +30,7 @@ struct MascotInfo {
     int dataId = -1;
     QString name;
     std::optional<QString> activeBehavior;
+    std::optional<int> cliLabel;
     double anchorX = 0.0;
     double anchorY = 0.0;
 };
@@ -52,6 +53,16 @@ struct SpawnMascotRequest {
     std::optional<QString> name;
     std::optional<int> dataId;
     MascotPatch patch;
+};
+
+struct RegisterCliLabelRequest {
+    int mascotId = -1;
+    std::optional<int> label;
+};
+
+struct CliLabelInfo {
+    int label = -1;
+    int mascotId = -1;
 };
 
 struct ListMascotsRequest {
@@ -82,10 +93,19 @@ struct MascotCommandStatus {
 
 QJsonObject mascotInfoToJson(MascotInfo const& mascot);
 QJsonObject loadedMascotInfoToJson(LoadedMascotInfo const& mascot);
+QJsonObject mascotPatchToJson(MascotPatch const& patch);
+QJsonObject spawnMascotRequestToJson(SpawnMascotRequest const& request);
+QJsonObject cliLabelInfoToJson(CliLabelInfo const& info);
 QJsonObject pingInfoToJson(ApiPingInfo const& ping);
 QJsonObject errorToJson(MascotCommandStatus const& status);
 
 bool mascotInfoFromJson(QJsonValue const& value, MascotInfo &mascot,
+    QString *errorMessage = nullptr);
+bool mascotPatchFromJson(QJsonValue const& value, MascotPatch &patch,
+    QString *errorMessage = nullptr);
+bool spawnMascotRequestFromJson(QJsonValue const& value,
+    SpawnMascotRequest &request, QString *errorMessage = nullptr);
+bool cliLabelInfoFromJson(QJsonValue const& value, CliLabelInfo &info,
     QString *errorMessage = nullptr);
 bool loadedMascotInfoFromJson(QJsonValue const& value,
     LoadedMascotInfo &mascot, QString *errorMessage = nullptr);
