@@ -36,6 +36,18 @@ void showOnAllDesktops(QWidget *widget) {
     }
 }
 
+void refreshTopmost(QWidget *widget) {
+    HWND window = (HWND)widget->winId();
+    if (window == NULL || !IsWindow(window)) {
+        return;
+    }
+
+    // Reassert the topmost z-order without stealing focus so the mascot
+    // can move back above the taskbar after the taskbar is clicked.
+    SetWindowPos(window, HWND_TOPMOST, 0, 0, 0, 0,
+        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+}
+
 bool useWindowMasks() {
     return false;
 }

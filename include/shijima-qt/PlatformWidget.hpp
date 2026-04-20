@@ -47,6 +47,7 @@ private:
         if (this->winId() != 0) {
             if (m_flags & ShowOnAllDesktops) {
                 Platform::showOnAllDesktops(this);
+                Platform::refreshTopmost(this);
             }
         }
     }

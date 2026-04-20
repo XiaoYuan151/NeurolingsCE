@@ -66,6 +66,9 @@ void ShijimaWidget::mousePressEvent(QMouseEvent *event) {
             return;
         }
     }
+    if (!m_windowedMode) {
+        Platform::refreshTopmost(m_dragTarget);
+    }
     if (event->button() == Qt::MouseButton::LeftButton) {
         m_dragTarget->m_mascot->state->dragging = true;
         // Record press info for click detection

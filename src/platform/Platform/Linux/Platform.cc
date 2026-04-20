@@ -158,6 +158,8 @@ void showOnAllDesktops(QWidget *widget) {
     }
 }
 
+void refreshTopmost(QWidget *widget) {}
+
 bool useWindowMasks() {
     return windowMasksEnabled;
 }

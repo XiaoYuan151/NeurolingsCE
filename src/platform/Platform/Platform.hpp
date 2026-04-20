@@ -27,6 +27,7 @@ namespace Platform {
 
 void initialize(int argc, char **argv);
 void showOnAllDesktops(QWidget *widget);
+void refreshTopmost(QWidget *widget);
 bool useWindowMasks();
 
 }
