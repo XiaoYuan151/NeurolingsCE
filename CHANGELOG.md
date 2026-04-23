@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.0] - 2026-04-23
+
+### 🚀 Major Changes / 重大变更
+
+#### CLI & Runtime Control Upgrade / CLI 与运行时控制升级
+- **Standalone CLI Program** - Added `NeurolingsCE-cli` as an independent command line entry for mascot management and runtime control
+  - 独立 CLI 程序 - 新增 `NeurolingsCE-cli`，可作为独立的桌宠管理与运行时控制入口
+- **Local IPC Control Path** - Runtime mascot control commands now communicate through local IPC instead of HTTP, with automatic runtime startup when needed
+  - 本地 IPC 控制链路 - 运行时桌宠控制命令现通过本地 IPC 通信，并可在需要时自动启动运行时
+- **Unified Command Service** - Refactored the command execution flow so CLI and HTTP interfaces share the same core control logic
+  - 统一命令服务 - 重构命令执行流程，使 CLI 与 HTTP 接口共用同一套核心控制逻辑
+
+#### Workflow & Packaging Improvements / 工作流与打包增强
+- **Mascot Library Refresh** - Added refresh support on the main page to rescan and sync mascot templates
+  - 桌宠库刷新 - 在主页新增刷新能力，可重新扫描并同步桌宠模板库
+- **Windows Installer Pipeline** - Added Windows installer packaging flow and related release assets
+  - Windows 安装器流水线 - 新增 Windows 安装器打包流程及相关发布资源
+- **Companion Skill Split** - Split mascot control and companion skill workflows for cleaner automation usage
+  - 配套 Skill 拆分 - 拆分桌宠控制与陪伴 skill 工作流，提升自动化调用清晰度
+
+### ✨ Added / 新增功能
+
+- **Independent CLI executable** - `NeurolingsCE-cli` can be used directly in shell scripts, automation tools, and agent workflows / 新增独立 CLI 可执行文件 `NeurolingsCE-cli`，可直接用于脚本、自动化和 agent 工作流
+- **Automatic runtime bootstrap** - Mascot control commands can automatically connect to or start the NeurolingsCE runtime when required / 新增运行时自动拉起能力，桌宠控制命令可按需自动连接或启动 NeurolingsCE 运行时
+- **Main page refresh action** - Added a refresh button to update mascot data and synchronize the mascot library / 新增主页刷新按钮，可更新桌宠数据并同步桌宠库
+- **NeurolingsCE skill tooling** - Added companion skill support, CLI finder cache tooling, and summon helper scripts / 新增 NeurolingsCE 配套 skill、CLI 查找缓存工具与召唤辅助脚本
+- **Windows installer support** - Added WiX-based Windows installer and packaging workflow for release distribution / 新增基于 WiX 的 Windows 安装器与打包工作流，便于发布分发
+
+### 🐛 Fixed / Bug 修复
+
+- Fixed cases where mascot windows could still be covered by the taskbar due to topmost layer refresh issues / 修复因置顶层级刷新异常导致桌宠仍可能被任务栏遮挡的问题
+- Fixed validation issues in mascot-related CLI command flows and filtered incompatible legacy behavior more safely / 修复桌宠相关 CLI 命令流程中的校验问题，并更安全地过滤不兼容的旧行为
+- Fixed edge-case crashes by strengthening crash logging and asset fallback behavior / 通过增强崩溃日志与资源回退逻辑，修复若干边界情况下的崩溃问题
+- Fixed existing-instance wake-up behavior and adjusted log file output location / 修复唤醒已有实例的行为问题，并调整日志落盘位置
+
+### 🔧 Changed / 改进与优化
+
+- **Control Architecture** - Reworked mascot control around local IPC for a more reliable desktop-native control path / 控制架构优化 - 围绕本地 IPC 重构桌宠控制流程，使桌面原生控制链路更加稳定
+- **Automation Experience** - Optimized summon semantics and CLI path reuse for automated and skill-based invocation / 自动化体验优化 - 优化召唤语义与 CLI 路径复用，提升自动化与 skill 调用体验
+- **Documentation** - Updated CLI, local IPC, skill usage, packaging, screenshots, and icon acknowledgements in the documentation / 文档更新 - 补充并更新 CLI、本地 IPC、skill 用法、打包说明、项目截图与图标致谢
+- **Release Assets** - Refreshed version metadata, package resources, and release-facing application assets / 发布资源整理 - 更新版本元数据、打包资源与面向发布的应用素材
+
+---
+
 ## [0.2.0] - 2026-03-14
 
 ### 🚀 Major Changes / 重大变更
@@ -79,6 +123,10 @@ As a community version of the Neuro mascot, NeurolingsCE is a complete port of t
 
 ## Contributors / 贡献者
 
+### [0.3.0]
+- [@qingchenyouforcc](https://github.com/qingchenyouforcc) - Main development, CLI/IPC integration, packaging, documentation updates / 主要开发，完成 CLI/IPC 集成、打包与文档更新
+- [@wyf7685](https://github.com/wyf7685) - CI fixes and code optimization / CI 修复与代码优化
+
 ### [0.2.0]
 - [@qingchenyouforcc](https://github.com/qingchenyouforcc) - Main development (81 commits) / 主要开发
 - [@wyf7685](https://github.com/wyf7685) - CI fixes and code optimization (8 commits) / CI 修复与代码优化
@@ -88,5 +136,6 @@ As a community version of the Neuro mascot, NeurolingsCE is a complete port of t
 
 ---
 
+[0.3.0]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.2.0...0.3.0
 [0.2.0]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.1.x...0.2.0
 [0.1.0]: https://github.com/qingchenyouforcc/NeurolingsCE/releases/tag/0.1.x
