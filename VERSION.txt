@@ -3,10 +3,10 @@
 # Update this file to change version and application names across all build systems.
 
 # Version Information
-VERSION=0.3.0
+VERSION=0.3.1
 VERSION_MAJOR=0
 VERSION_MINOR=3
-VERSION_PATCH=0
+VERSION_PATCH=1
 
 # Human-readable version name (optional)
 VERSION_NAME=Alpha
