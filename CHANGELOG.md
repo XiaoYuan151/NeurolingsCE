@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.1] - 2026-04-24
+
+### 🚀 Major Changes / 重大变更
+
+#### Update Experience Upgrade / 更新体验升级
+- **GitHub Update Check** - Added built-in update checking against GitHub releases
+  - GitHub 更新检查 - 新增基于 GitHub Release 的内置更新检查能力
+- **About Page Update Center** - Added an update center entry in the about page for version and release information
+  - 关于页更新中心 - 在关于页面中新增更新中心入口，用于展示版本与发布信息
+- **Settings Page Rework** - Refactored the settings page layout for a clearer and more maintainable structure
+  - 设置页重构 - 重构设置页面布局，使功能分区更清晰、结构更易维护
+
+#### Localization & Release Metadata / 本地化与发布元数据
+- **Chinese Translation Completion** - Added Chinese translations for the new update-related UI
+  - 中文翻译补全 - 为新增更新功能相关界面补充中文翻译
+- **Version Metadata Sync** - Synchronized the 0.3.1 version metadata for release packaging and display
+  - 版本元数据同步 - 同步 0.3.1 版本元数据，用于发布打包与版本展示
+
+### ✨ Added / 新增功能
+
+- **GitHub release update check** - The application can now check whether a newer version is available on GitHub / 新增 GitHub Release 更新检查能力，应用现在可以检查是否存在新版本
+- **In-app update center** - Added update information entry in the about page / 新增应用内更新中心入口，可在关于页查看更新信息
+- **Reorganized settings UI** - Improved settings page grouping and readability / 新增更清晰的设置页组织方式，提升可读性与易用性
+- **Update feature localization** - Added Chinese text coverage for update-related actions and prompts / 新增更新功能相关操作与提示的中文文本覆盖
+
+### 🐛 Fixed / Bug 修复
+
+- Fixed missing or incomplete Chinese text in the new update-related UI / 修复新增更新相关界面中缺失或不完整的中文文本
+- Fixed settings page organization issues that made some options harder to find / 修复设置页结构较杂乱、部分选项不易定位的问题
+- Fixed version metadata inconsistency affecting release-facing version display / 修复版本元数据不同步导致的发布侧版本展示不一致问题
+
+### 🔧 Changed / 改进与优化
+
+- **Update Workflow** - Improved how users discover new versions from within the application / 更新流程优化 - 改善用户在应用内发现新版本的方式
+- **UI Structure** - Refined the settings page information hierarchy and page layout / 界面结构优化 - 调整设置页信息层级与页面布局
+- **Localization** - Expanded translation coverage around the update feature / 本地化优化 - 完善更新功能周边的翻译覆盖
+- **Release Preparation** - Refreshed 0.3.1 metadata for packaging and release notes alignment / 发布准备优化 - 刷新 0.3.1 元数据，使打包结果与发布说明保持一致
+
+---
+
 ## [0.3.0] - 2026-04-23
 
 ### 🚀 Major Changes / 重大变更
@@ -123,6 +163,10 @@ As a community version of the Neuro mascot, NeurolingsCE is a complete port of t
 
 ## Contributors / 贡献者
 
+### [0.3.1]
+- [@qingchenyouforcc](https://github.com/qingchenyouforcc) - Main development, update center, settings page rework, localization updates / 主要开发，完成更新中心、设置页重构与本地化更新
+- [@wyf7685](https://github.com/wyf7685) - CI fixes and code optimization / CI 修复与代码优化
+
 ### [0.3.0]
 - [@qingchenyouforcc](https://github.com/qingchenyouforcc) - Main development, CLI/IPC integration, packaging, documentation updates / 主要开发，完成 CLI/IPC 集成、打包与文档更新
 - [@wyf7685](https://github.com/wyf7685) - CI fixes and code optimization / CI 修复与代码优化
@@ -136,6 +180,7 @@ As a community version of the Neuro mascot, NeurolingsCE is a complete port of t
 
 ---
 
+[0.3.1]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.3.0...0.3.1
 [0.3.0]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.2.0...0.3.0
 [0.2.0]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.1.x...0.2.0
 [0.1.0]: https://github.com/qingchenyouforcc/NeurolingsCE/releases/tag/0.1.x
