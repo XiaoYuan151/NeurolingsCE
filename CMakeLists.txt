@@ -174,6 +174,7 @@ target_sources(NeurolingsCE PRIVATE
   src/app/core/commands/MascotCommandService.cc
   src/app/core/localipc/ShijimaLocalApiClient.cc
   src/app/core/localipc/ShijimaLocalApi.cc
+  src/app/core/update/GitHubUpdateManager.cc
   src/app/ui/menus/ShijimaContextMenu.cc
   src/app/ui/menus/ContextMenuActions.cc
   src/app/core/audio/SoundEffectManager.cc
@@ -210,6 +211,7 @@ target_sources(NeurolingsCE PRIVATE
   include/shijima-qt/ui/menus/ShijimaContextMenu.hpp
   include/shijima-qt/ui/dialogs/licenses/ShijimaLicensesDialog.hpp
   include/shijima-qt/ui/dialogs/inspector/ShimejiInspectorDialog.hpp
+  src/app/core/update/GitHubUpdateManager.hpp
 
   include/shijima-qt/ui/widgets/SpeechBubbleWidget.hpp
   src/platform/Platform/Platform.hpp

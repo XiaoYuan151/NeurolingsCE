@@ -18,6 +18,7 @@
 
 #include "shijima-qt/ShijimaManager.hpp"
 #include "shijima-qt/AppLog.hpp"
+#include "../core/update/GitHubUpdateManager.hpp"
 
 #include "../runtime/ManagerRuntimeState.hpp"
 #include "ManagerUiState.hpp"
@@ -37,6 +38,7 @@
 #include <QScreen>
 #include <QStandardPaths>
 #include <QStyleHints>
+#include <QTimer>
 #include <QVariant>
 
 #include "ElaStatusBar.h"
@@ -83,6 +85,9 @@ ShijimaManager::ShijimaManager(QWidget *parent):
     m_runtime->mascotsPath = mascotsPath;
     APP_LOG_INFO("startup") << "Mascot storage path=\""
         << m_runtime->mascotsPath.toStdString() << "\"";
+    m_updateManager = new GitHubUpdateManager(&m_settings, this);
+    connect(m_updateManager, &GitHubUpdateManager::startupUpdateAvailable,
+        this, &ShijimaManager::showStartupUpdateNotification);
 
     loadDefaultMascot();
     loadAllMascots();
@@ -158,6 +163,7 @@ ShijimaManager::ShijimaManager(QWidget *parent):
     m_localApi.start();
     if (!m_runtime->cliRuntimeMode) {
         m_httpApi.start("127.0.0.1", 32456);
+        startStartupUpdateCheck();
     }
     APP_LOG_INFO("startup") << "Manager window initialized";
 }
@@ -184,4 +190,32 @@ void ShijimaManager::changeEvent(QEvent *event) {
         ShijimaManagerUiInternal::refreshTrayMenu(this);
     }
     PlatformWidget::changeEvent(event);
+}
+
+void ShijimaManager::startStartupUpdateCheck()
+{
+    if (m_updateManager == nullptr) {
+        return;
+    }
+    if (!m_settings.value("update/checkOnStartup", true).toBool()) {
+        return;
+    }
+
+    QTimer::singleShot(1500, this, [this]() {
+        if (m_updateManager != nullptr) {
+            m_updateManager->checkForUpdates(GitHubUpdateManager::CheckMode::Startup);
+        }
+    });
+}
+
+void ShijimaManager::showStartupUpdateNotification(QString const& version)
+{
+    ShijimaManagerUiInternal::showTrayMessage(
+        tr("Update Available"),
+        tr("NeurolingsCE %1 is available. Click to open the About page.")
+            .arg(QStringLiteral("v%1").arg(version)),
+        [this]() {
+            setManagerVisible(true);
+            showAboutDialog();
+        });
 }

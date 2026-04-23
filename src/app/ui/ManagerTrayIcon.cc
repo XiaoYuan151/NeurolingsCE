@@ -18,6 +18,7 @@
 
 #include "shijima-qt/ShijimaManager.hpp"
 #include "ManagerUiHelpers.hpp"
+#include <functional>
 #include <QApplication>
 #include <QCoreApplication>
 #include <QMenu>
@@ -28,6 +29,7 @@ namespace {
 
 QSystemTrayIcon *g_trayIcon = nullptr;
 QMenu *g_trayMenu = nullptr;
+std::function<void()> g_messageClickHandler;
 
 QIcon makeTrayIconFallback(QWidget *widget) {
     QIcon ico { QStringLiteral(":/neurolingsce.ico") };
@@ -140,6 +142,14 @@ void setupTrayIcon(ShijimaManager *manager) {
                 refreshTrayMenu(manager);
             }
         });
+    QObject::connect(g_trayIcon, &QSystemTrayIcon::messageClicked, manager, []() {
+        if (!g_messageClickHandler) {
+            return;
+        }
+        auto handler = g_messageClickHandler;
+        g_messageClickHandler = {};
+        handler();
+    });
 
     g_trayIcon->show();
 }
@@ -156,6 +166,18 @@ void teardownTrayIcon() {
         g_trayMenu->deleteLater();
         g_trayMenu = nullptr;
     }
+    g_messageClickHandler = {};
+}
+
+void showTrayMessage(QString const& title, QString const& message,
+    std::function<void()> onClick)
+{
+    if (g_trayIcon == nullptr) {
+        return;
+    }
+
+    g_messageClickHandler = std::move(onClick);
+    g_trayIcon->showMessage(title, message, QSystemTrayIcon::Information, 10000);
 }
 
 }

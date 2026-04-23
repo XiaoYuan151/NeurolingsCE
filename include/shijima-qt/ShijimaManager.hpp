@@ -53,6 +53,7 @@ class QTimerEvent;
 class QTranslator;
 class QWidget;
 class ShijimaWidget;
+class GitHubUpdateManager;
 struct ShijimaManagerRuntimeState;
 struct ShijimaManagerUiState;
 
@@ -115,6 +116,7 @@ private:
     void setupHomePage();
     void setupSettingsPage();
     void setupAboutPage();
+    void showAboutDialog();
     void importAction();
     void deleteAction();
     void updateSandboxBackground();
@@ -128,10 +130,13 @@ private:
     void retranslateUi();
     void switchLanguage(const QString &langCode);
     void updateStatusBar();
+    void startStartupUpdateCheck();
+    void showStartupUpdateNotification(QString const& version);
     QScreen *mascotScreen();
     std::unique_ptr<ShijimaManagerRuntimeState> m_runtime;
     std::unique_ptr<ShijimaManagerUiState> m_ui;
     QSettings m_settings;
+    GitHubUpdateManager *m_updateManager = nullptr;
     bool m_allowClose = false;
     bool m_firstShow = true;
     bool m_wasVisible = false;

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <functional>
 #include <QString>
 
 class QColor;
@@ -31,5 +32,7 @@ void applyMascotListTheme(QListWidget& listWidget);
 void refreshTrayMenu(ShijimaManager *manager);
 void setupTrayIcon(ShijimaManager *manager);
 void teardownTrayIcon();
+void showTrayMessage(QString const& title, QString const& message,
+    std::function<void()> onClick = {});
 
 }
