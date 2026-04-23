@@ -18,8 +18,13 @@
 
 #include <QApplication>
 #include <QCoreApplication>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
 #include <QIcon>
 #include <QMessageBox>
+#include <QProcess>
+#include <QProcessEnvironment>
 #include "shijima-qt/AppLog.hpp"
 #include <shijima/log.hpp>
 #include "Platform/Platform.hpp"
@@ -46,6 +51,56 @@ bool cliRuntimeMode(int argc, char **argv) {
         }
     }
     return false;
+}
+
+void syncBundledSkillsForCurrentUser(QCoreApplication *app) {
+#ifdef _WIN32
+    if (app == nullptr) {
+        return;
+    }
+
+    QString appRoot = app->applicationDirPath();
+    QString installScript = QDir(appRoot)
+        .filePath(QStringLiteral("neurolingsce-skill/scripts/install_to_codex_home.ps1"));
+    if (!QFileInfo::exists(installScript)) {
+        return;
+    }
+
+    QString program = QStringLiteral("powershell.exe");
+    QStringList arguments {
+        QStringLiteral("-NoProfile"),
+        QStringLiteral("-ExecutionPolicy"),
+        QStringLiteral("Bypass"),
+        QStringLiteral("-File"),
+        installScript,
+        QStringLiteral("-AppRoot"),
+        appRoot,
+    };
+
+    QProcess process;
+    process.setProgram(program);
+    process.setArguments(arguments);
+    process.start();
+    if (!process.waitForStarted(5000)) {
+        APP_LOG_WARN("startup") << "Could not start bundled skill install script";
+        return;
+    }
+    if (!process.waitForFinished(15000)) {
+        process.kill();
+        process.waitForFinished(3000);
+        APP_LOG_WARN("startup") << "Bundled skill install script timed out";
+        return;
+    }
+    if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
+        APP_LOG_WARN("startup") << "Bundled skill install script failed with exit code"
+            << process.exitCode() << "stderr="
+            << process.readAllStandardError().toStdString();
+        return;
+    }
+    APP_LOG_INFO("startup") << "Bundled skill install script completed";
+#else
+    Q_UNUSED(app);
+#endif
 }
 
 #ifdef _WIN32
@@ -114,6 +169,7 @@ int main(int argc, char **argv) {
 #ifdef _WIN32
     SetUnhandledExceptionFilter(appUnhandledExceptionFilter);
 #endif
+    syncBundledSkillsForCurrentUser(&app);
     eApp->init();
     {
         QIcon appIcon { QStringLiteral(":/neurolingsce.ico") };
@@ -125,6 +181,11 @@ int main(int argc, char **argv) {
         }
     }
     try {
+        if (!startedForCli && shijimaLocalApiShowManager()) {
+            APP_LOG_INFO("startup") << "Existing instance activated; exiting current GUI launch request";
+            AppLog::shutdown();
+            return 0;
+        }
         if (shijimaLocalApiPing()) {
             APP_LOG_ERROR("startup") << "Single-instance guard rejected startup; local IPC endpoint already responded";
             if (startedForCli) {

@@ -139,3 +139,16 @@ bool shijimaLocalApiPing(ShijimaLocalApiClientOptions const& options) {
     return pingServer(shijimaLocalApiServerName(), options.connectTimeoutMs,
         options.readTimeoutMs);
 }
+
+bool shijimaLocalApiShowManager(ShijimaLocalApiClientOptions const& options) {
+    QJsonObject response;
+    QString transportError;
+    if (!shijimaLocalApiRequest(QJsonObject {
+        { kCommandKey, QStringLiteral("show_manager") },
+    }, response, transportError, options))
+    {
+        return false;
+    }
+
+    return !response.contains(QStringLiteral("error"));
+}

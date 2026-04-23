@@ -294,6 +294,13 @@ QJsonObject dispatchRequest(QJsonObject const& request,
         } : errorToJson(status);
     }
 
+    if (command == QStringLiteral("show_manager")) {
+        auto status = service.showManagerWindow();
+        return status.ok() ? QJsonObject {
+            { QStringLiteral("shown"), true },
+        } : errorToJson(status);
+    }
+
     return invalidRequest(QStringLiteral("Unknown command"));
 }
 

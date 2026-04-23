@@ -40,6 +40,8 @@ bool shijimaLocalApiRequest(QJsonObject const& request, QJsonObject &response,
     ShijimaLocalApiClientOptions const& options = {});
 bool shijimaLocalApiPing(
     ShijimaLocalApiClientOptions const& options = {});
+bool shijimaLocalApiShowManager(
+    ShijimaLocalApiClientOptions const& options = {});
 
 class ShijimaLocalApi {
 private:

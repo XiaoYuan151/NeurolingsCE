@@ -188,3 +188,7 @@ libshimejifinder/build/
 /src/platform/Platform/Linux/kwin_script.c
 /build_test.bat
 /build_output.txt
+/shijima_stdout.txt
+/shijima_stderr.txt
+/neurolingsce-skill/cache/
+/neurolingsce-companion/cache/

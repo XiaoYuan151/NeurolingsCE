@@ -31,6 +31,7 @@
 #include <QLoggingCategory>
 #include <QMessageLogContext>
 #include <QProcessEnvironment>
+#include <QStandardPaths>
 #include <QThread>
 
 namespace {
@@ -65,17 +66,29 @@ QString dateFolderName() {
 }
 
 QString preferredLogRootDirectory(QCoreApplication *app) {
-    QString currentDirLog = QDir::current().filePath("log");
-    if (!currentDirLog.isEmpty()) {
-        return currentDirLog;
+    Q_UNUSED(app);
+
+#ifdef _WIN32
+    QString localAppData = QProcessEnvironment::systemEnvironment()
+        .value(QStringLiteral("LOCALAPPDATA")).trimmed();
+    if (!localAppData.isEmpty()) {
+        return QDir(localAppData).filePath(QStringLiteral("NeurolingsCE/log"));
     }
-    if (app != nullptr) {
-        QString appDir = app->applicationDirPath();
-        if (!appDir.isEmpty()) {
-            return QDir(appDir).filePath("log");
-        }
+
+    QString appLocalData = QStandardPaths::writableLocation(
+        QStandardPaths::AppLocalDataLocation).trimmed();
+    if (!appLocalData.isEmpty()) {
+        return QDir(appLocalData).filePath(QStringLiteral("log"));
     }
-    return QDir::current().filePath("log");
+#else
+    QString appLocalData = QStandardPaths::writableLocation(
+        QStandardPaths::AppLocalDataLocation).trimmed();
+    if (!appLocalData.isEmpty()) {
+        return QDir(appLocalData).filePath(QStringLiteral("log"));
+    }
+#endif
+
+    return QDir::home().filePath(QStringLiteral(".neurolingsce/log"));
 }
 
 bool tryOpenLogFileAtRoot(QString const& rootDirectoryPath) {
@@ -212,9 +225,8 @@ void initialize(QCoreApplication *app) {
     if (g_logFile == nullptr) {
         QString preferredRoot = preferredLogRootDirectory(app);
         if (!tryOpenLogFileAtRoot(preferredRoot)) {
-            QString fallbackRoot = app != nullptr
-                ? QDir(app->applicationDirPath()).filePath("log")
-                : QDir::current().filePath("log");
+            QString fallbackRoot = QDir(QDir::tempPath())
+                .filePath(QStringLiteral("NeurolingsCE/log"));
             if (fallbackRoot != preferredRoot) {
                 tryOpenLogFileAtRoot(fallbackRoot);
             }

@@ -49,6 +49,7 @@ public:
         QList<LoadedMascotInfo> &out) const;
     MascotCommandStatus removeMascotTemplate(QString const& mascotName) const;
     MascotCommandStatus stopRuntime() const;
+    MascotCommandStatus showManagerWindow() const;
     MascotCommandStatus getLoadedMascot(int mascotId,
         LoadedMascotInfo &out) const;
     MascotCommandStatus getLoadedMascotPreviewPng(int mascotId,

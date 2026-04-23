@@ -229,12 +229,14 @@ void ShijimaManager::askClose() {
 }
 
 void ShijimaManager::setManagerVisible(bool visible) {
-    if (!m_wasVisible && visible) {
+    if (visible) {
         if (isMinimized()) {
             setWindowState(windowState() & ~Qt::WindowMinimized);
         }
         show();
+        raise();
         if (window() != nullptr) {
+            window()->raise();
             window()->activateWindow();
         }
         m_wasVisible = true;

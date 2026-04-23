@@ -364,6 +364,13 @@ MascotCommandStatus MascotCommandService::stopRuntime() const {
     return MascotCommandStatus::success();
 }
 
+MascotCommandStatus MascotCommandService::showManagerWindow() const {
+    QMetaObject::invokeMethod(m_manager, [manager = m_manager]() {
+        manager->setManagerVisible(true);
+    }, Qt::QueuedConnection);
+    return MascotCommandStatus::success();
+}
+
 MascotCommandStatus MascotCommandService::getLoadedMascot(int mascotId,
     LoadedMascotInfo &out) const
 {
