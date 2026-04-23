@@ -1,5 +1,5 @@
 # Read version and app info from VERSION.txt file
-NEUROLINGSCE_VERSION := $(shell grep "^VERSION=" VERSION.txt 2>/dev/null | cut -d= -f2 || echo "0.2.0")
+NEUROLINGSCE_VERSION := $(shell grep "^VERSION=" VERSION.txt 2>/dev/null | cut -d= -f2 || echo "0.3.0")
 APP_NAME := $(shell grep "^APP_NAME=" VERSION.txt 2>/dev/null | cut -d= -f2 || echo "NeurolingsCE")
 APP_DISPLAY_NAME := $(shell grep "^APP_DISPLAY_NAME=" VERSION.txt 2>/dev/null | cut -d= -f2 || echo "NeurolingsCE[Shijima-Qt Edition]")
 APP_EXECUTABLE := $(shell grep "^APP_EXECUTABLE=" VERSION.txt 2>/dev/null | cut -d= -f2 || echo "shijima-qt")

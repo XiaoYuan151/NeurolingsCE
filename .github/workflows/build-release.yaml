@@ -35,9 +35,8 @@ jobs:
 
           - runner: windows-latest
             host: windows
-            qt_tools: tools_mingw1310
-            qt_arch: win64_mingw
-            qt_install_name: mingw_64
+            qt_arch: win64_msvc2022_64
+            qt_install_name: msvc2022_64
             artifact_name: windows-x86_64
             artifact_path: build/bin/
 
@@ -68,6 +67,10 @@ jobs:
           tools: ${{ matrix.platform.qt_tools || '' }}
           cache: true
 
+      - name: Setup MSVC environment
+        if: matrix.platform.host == 'windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
@@ -88,11 +91,41 @@ jobs:
         run: |
           cmake --build build --parallel --config Release ${{ matrix.platform.build_args || '' }}
 
+      - name: Install WiX 7
+        if: matrix.platform.host == 'windows'
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version 7.0.0
+          "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          & "$env:USERPROFILE\.dotnet\tools\wix.exe" eula accept wix7
+          & "$env:USERPROFILE\.dotnet\tools\wix.exe" extension add -g WixToolset.UI.wixext/7.0.0
+          & "$env:USERPROFILE\.dotnet\tools\wix.exe" extension add -g WixToolset.Util.wixext/7.0.0
+          & "$env:USERPROFILE\.dotnet\tools\wix.exe" extension add -g WixToolset.BootstrapperApplications.wixext/7.0.0
+
+      - name: Package Windows installers
+        if: matrix.platform.host == 'windows'
+        shell: pwsh
+        run: |
+          powershell -ExecutionPolicy Bypass -File .\src\tools\package-windows-bin.ps1 -SourceDir build/bin
+          powershell -ExecutionPolicy Bypass -File .\installer\wix\build-msi.ps1 -WixExe "$env:USERPROFILE\.dotnet\tools\wix.exe"
+          powershell -ExecutionPolicy Bypass -File .\installer\wix\build-bundle.ps1 -WixExe "$env:USERPROFILE\.dotnet\tools\wix.exe"
+
       - name: Archive ${{ matrix.platform.artifact_name }} release build
         uses: actions/upload-artifact@v4
         with:
           name: release-${{ matrix.platform.artifact_name }}
           path: ${{ matrix.platform.artifact_path }}
+          retention-days: 1
+
+      - name: Archive Windows installer artifacts
+        if: matrix.platform.host == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-windows-installers
+          path: |
+            out/package/*.zip
+            out/installer/*.msi
+            out/installer/*-setup.exe
           retention-days: 1
 
   build-macos:

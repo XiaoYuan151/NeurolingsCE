@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package
+      Name="{{ProductName}}"
+      Manufacturer="{{Manufacturer}}"
+      Version="{{Version}}"
+      UpgradeCode="{{UpgradeCode}}"
+      Codepage="UTF-8"
+      Scope="perMachine"
+      Compressed="yes">
+    <ui:WixUI Id="WixUI_InstallDir" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Icon Id="AppIcon.ico" SourceFile="{{IconPath}}" />
+    <WixVariable Id="WixUILicenseRtf" Value="{{LicenseRtfPath}}" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon.ico" />
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="{{ExitLaunchText}}" />
+    <Property Id="WixShellExecTarget" Value="[#{{MainExecutableFileId}}]" />
+    <Property Id="NEUROLINGSCE_CREATE_DESKTOP_SHORTCUT" Value="1" />
+    <Property Id="NEUROLINGSCE_CREATE_START_MENU_SHORTCUT" Value="1" />
+    <Property Id="NEUROLINGSCE_INSTALL_SKILL" Value="1" />
+    <Property Id="NEUROLINGSCE_INSTALL_SKILL_TO_USER" Value="1" />
+    <Property Id="VCREDISTX64INSTALLED">
+      <RegistrySearch
+          Id="SearchVcRedistX64Installed"
+          Root="HKLM"
+          Key="SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64"
+          Name="Installed"
+          Type="raw" />
+    </Property>
+
+    <CustomAction
+        Id="LaunchApplication"
+        BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+        DllEntry="WixShellExec"
+        Impersonate="yes" />
+
+    <CustomAction
+        Id="InstallVcRedist"
+        FileRef="{{VcRedistFileId}}"
+        ExeCommand="/install /quiet /norestart"
+        Execute="deferred"
+        Impersonate="no"
+        Return="ignore" />
+
+    <SetProperty
+        Id="WixQuietExecCmdLine"
+        Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -File &quot;[#{{InstallSkillScriptFileId}}]&quot; -AppRoot &quot;[INSTALLFOLDER]&quot;"
+        Before="InstallSkillToUserDirectory"
+        Sequence="execute" />
+
+    <SetProperty
+        Id="WixSilentExecCmdLine"
+        Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -File &quot;[#{{InstallSkillScriptFileId}}]&quot; -AppRoot &quot;[INSTALLFOLDER]&quot;"
+        Before="InstallSkillToUserDirectoryUi"
+        Sequence="ui" />
+
+    <CustomAction
+        Id="InstallSkillToUserDirectory"
+        BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+        DllEntry="WixQuietExec"
+        Execute="immediate"
+        Impersonate="yes"
+        Return="check" />
+
+    <CustomAction
+        Id="InstallSkillToUserDirectoryUi"
+        BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+        DllEntry="WixSilentExec"
+        Execute="immediate"
+        Impersonate="yes"
+        Return="ignore" />
+
+    <InstallExecuteSequence>
+      <Custom Action="InstallVcRedist" After="InstallFinalize" Condition="NOT Installed AND NOT VCREDISTX64INSTALLED" />
+      <Custom Action="InstallSkillToUserDirectory" After="InstallFinalize" Condition="NOT REMOVE~=&quot;ALL&quot; AND NEUROLINGSCE_INSTALL_SKILL = 1 AND NEUROLINGSCE_INSTALL_SKILL_TO_USER = 1" />
+    </InstallExecuteSequence>
+
+    <InstallUISequence>
+      <Custom Action="InstallSkillToUserDirectoryUi" After="ExecuteAction" Condition="0" />
+    </InstallUISequence>
+
+    <UI>
+      <Dialog Id="NeurolingsOptionsDlg" Width="370" Height="290" Title="[ProductName] Setup">
+        <Control Id="Title" Type="Text" X="15" Y="15" Width="320" Height="18" Transparent="yes" NoPrefix="yes" Text="Installation Options" />
+        <Control Id="Description" Type="Text" X="15" Y="35" Width="330" Height="30" Transparent="yes" NoPrefix="yes" Text="Choose which optional items should be installed with [ProductName]." />
+        <Control Id="Separator" Type="Line" X="0" Y="70" Width="370" Height="0" />
+        <Control Id="DesktopShortcutCheckbox" Type="CheckBox" X="20" Y="90" Width="310" Height="17" Property="NEUROLINGSCE_CREATE_DESKTOP_SHORTCUT" CheckBoxValue="1" Text="Create a desktop shortcut" />
+        <Control Id="StartMenuShortcutCheckbox" Type="CheckBox" X="20" Y="114" Width="310" Height="17" Property="NEUROLINGSCE_CREATE_START_MENU_SHORTCUT" CheckBoxValue="1" Text="Create a Start menu shortcut" />
+        <Control Id="InstallSkillCheckbox" Type="CheckBox" X="20" Y="138" Width="330" Height="17" Property="NEUROLINGSCE_INSTALL_SKILL" CheckBoxValue="1" Text="Install the NeurolingsCE companion skill" />
+        <Control Id="InstallSkillToUserCheckbox" Type="CheckBox" X="38" Y="162" Width="310" Height="17" Property="NEUROLINGSCE_INSTALL_SKILL_TO_USER" CheckBoxValue="1" Text="Copy skill to .agents/skills" />
+        <Control Id="SkillDescription" Type="Text" X="38" Y="186" Width="300" Height="42" Transparent="yes" NoPrefix="yes" Text="If it already exists, the installer will remove the old copy and reinstall it." />
+        <Control Id="Back" Type="PushButton" X="180" Y="263" Width="56" Height="17" Text="Back">
+          <Publish Event="NewDialog" Value="InstallDirDlg" Condition="1" />
+        </Control>
+        <Control Id="Next" Type="PushButton" X="236" Y="263" Width="56" Height="17" Default="yes" Text="Next">
+          <Publish Event="NewDialog" Value="VerifyReadyDlg" Condition="1" />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="263" Width="56" Height="17" Cancel="yes" Text="Cancel">
+          <Publish Event="SpawnDialog" Value="CancelDlg" Condition="1" />
+        </Control>
+      </Dialog>
+
+      <Publish
+          Dialog="InstallDirDlg"
+          Control="Next"
+          Event="NewDialog"
+          Value="NeurolingsOptionsDlg"
+          Order="10"
+          Condition="1" />
+      <Publish
+          Dialog="ExitDialog"
+          Control="Finish"
+          Event="DoAction"
+          Value="InstallSkillToUserDirectoryUi"
+          Order="10"
+          Condition="NOT Installed AND NEUROLINGSCE_INSTALL_SKILL = 1 AND NEUROLINGSCE_INSTALL_SKILL_TO_USER = 1" />
+      <Publish
+          Dialog="ExitDialog"
+          Control="Finish"
+          Event="DoAction"
+          Value="LaunchApplication"
+          Order="20"
+          Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed" />
+    </UI>
+
+    <Feature Id="MainFeature" Title="{{ProductName}}" Level="1">
+      <ComponentGroupRef Id="PackageFiles" />
+      <ComponentRef Id="ApplicationShortcutCleanupComponent" />
+      <ComponentRef Id="ApplicationStartMenuShortcutComponent" />
+      <ComponentRef Id="ApplicationDesktopShortcutComponent" />
+    </Feature>
+  </Package>
+
+  <Fragment>
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="{{InstallFolderName}}" />
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="{{InstallFolderName}}" />
+    </StandardDirectory>
+  </Fragment>
+
+  <Fragment>
+    <DirectoryRef Id="ApplicationProgramsFolder">
+      <Component Id="ApplicationShortcutCleanupComponent" Guid="{{ShortcutCleanupComponentGuid}}">
+        <RemoveFolder Id="RemoveApplicationProgramsFolder" Directory="ApplicationProgramsFolder" On="uninstall" />
+        <RegistryValue
+            Root="HKCU"
+            Key="Software\{{Manufacturer}}\{{ProductName}}"
+            Name="StartMenuFolder"
+            Type="integer"
+            Value="1"
+            KeyPath="yes" />
+      </Component>
+
+      <Component
+          Id="ApplicationStartMenuShortcutComponent"
+          Guid="{{StartMenuShortcutComponentGuid}}"
+          Condition="NEUROLINGSCE_CREATE_START_MENU_SHORTCUT = 1">
+        <Shortcut
+            Id="ApplicationStartMenuShortcut"
+            Name="{{ProductName}}"
+            Description="{{Description}}"
+            Target="[#{{MainExecutableFileId}}]"
+            WorkingDirectory="INSTALLFOLDER"
+            Icon="AppIcon.ico" />
+        <Shortcut
+            Id="ApplicationUninstallShortcut"
+            Name="Uninstall {{ProductName}}"
+            Description="Uninstall {{ProductName}}"
+            Target="[SystemFolder]msiexec.exe"
+            Arguments="/x [ProductCode]"
+            WorkingDirectory="INSTALLFOLDER"
+            Icon="AppIcon.ico" />
+        <RegistryValue
+            Root="HKCU"
+            Key="Software\{{Manufacturer}}\{{ProductName}}"
+            Name="StartMenuShortcut"
+            Type="integer"
+            Value="1"
+            KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+
+  <Fragment>
+    <StandardDirectory Id="DesktopFolder">
+      <Component
+          Id="ApplicationDesktopShortcutComponent"
+          Guid="{{DesktopShortcutComponentGuid}}"
+          Condition="NEUROLINGSCE_CREATE_DESKTOP_SHORTCUT = 1">
+        <Shortcut
+            Id="ApplicationDesktopShortcut"
+            Name="{{ProductName}}"
+            Description="{{Description}}"
+            Target="[#{{MainExecutableFileId}}]"
+            WorkingDirectory="INSTALLFOLDER"
+            Icon="AppIcon.ico" />
+        <RegistryValue
+            Root="HKCU"
+            Key="Software\{{Manufacturer}}\{{ProductName}}"
+            Name="DesktopShortcut"
+            Type="integer"
+            Value="1"
+            KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+  </Fragment>
+</Wix>

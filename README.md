@@ -55,6 +55,54 @@ cmake --build build
 
 也可以直接用 Visual Studio 打开项目，在 `CMakeSettings.json` 中已配置好 `x64-Debug` 和 `x64-Release` 两个方案。
 
+#### Windows 快速打包 bin 目录
+
+如果你已经通过 Visual Studio/CMake 构建好了 `out/build/x64-Release/bin`，可以直接运行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\src\tools\package-windows-bin.ps1
+```
+
+默认行为：
+
+- 读取 `VERSION.txt` 生成输出目录名
+- 将 `out/build/x64-Release/bin` 复制到 `out/package/NeurolingsCE_windows_x86_64_v<version>`
+- 若 `VERSION_NAME=Alpha`，会自动追加 `a` 后缀，例如 `NeurolingsCE_windows_x86_64_v0.3.0a`
+- 默认排除 `log/`、`shijima_stdout.txt`、`shijima_stderr.txt`
+- 同时生成 zip 包，便于测试分发或作为后续 MSI 输入目录
+
+常用参数：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\src\tools\package-windows-bin.ps1 `
+  -SourceDir out/build/x64-Release/bin `
+  -OutputRoot out/package `
+  -SkipVcRedist `
+  -SkipZip
+```
+
+#### Windows MSI（WiX）
+
+仓库现在也包含了一个 WiX 打包入口，建议流程是：
+
+1. 先运行 `package-windows-bin.ps1` 生成干净发布目录
+2. 再运行 `installer/wix/build-msi.ps1` 生成 MSI
+3. 如果需要把 `vc_redist.x64.exe` 正式串进安装流程，再运行 `installer/wix/build-bundle.ps1` 生成引导安装器 EXE
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\installer\wix\build-msi.ps1
+```
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\installer\wix\build-bundle.ps1
+```
+
+如果你还没安装 WiX，可以先只生成 `.wxs` 文件检查内容：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\installer\wix\build-msi.ps1 -GenerateOnly
+```
+
 ### Windows（MinGW 交叉编译 via Docker）
 
 ```bash

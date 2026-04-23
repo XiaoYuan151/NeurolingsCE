@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+  <Bundle
+      Name="{{ProductName}} Setup"
+      Manufacturer="{{Manufacturer}}"
+      Version="{{Version}}"
+      UpgradeCode="{{BundleUpgradeCode}}"
+      IconSourceFile="{{IconPath}}"
+      Compressed="yes">
+    <BootstrapperApplication>
+      <bal:WixStandardBootstrapperApplication
+          Theme="rtfLicense"
+          LicenseFile="{{LicenseRtfPath}}"
+          SuppressOptionsUI="yes"
+          ShowVersion="yes" />
+    </BootstrapperApplication>
+
+    <Chain>
+      <ExePackage
+          Id="VcRedistX64"
+          SourceFile="{{VcRedistPath}}"
+          PerMachine="yes"
+          Permanent="yes"
+          Vital="yes"
+          Compressed="yes"
+          DetectCondition="VcRedistX64Installed">
+        <CommandLine Condition="1" InstallArgument="/install /quiet /norestart" RepairArgument="/repair /quiet /norestart" />
+        <ExitCode Value="3010" Behavior="success" />
+        <ExitCode Value="1638" Behavior="success" />
+      </ExePackage>
+
+      <MsiPackage
+          Id="NeurolingsCEMsi"
+          SourceFile="{{MsiPath}}"
+          bal:DisplayInternalUICondition="1"
+          Vital="yes"
+          Compressed="yes" />
+    </Chain>
+  </Bundle>
+
+  <Fragment>
+    <util:RegistrySearch
+        Id="SearchVcRedistX64Installed"
+        Root="HKLM"
+        Key="SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64"
+        Value="Installed"
+        Variable="VcRedistX64Installed"
+        Result="value" />
+  </Fragment>
+</Wix>

@@ -55,6 +55,54 @@ cmake --build build
 
 You can also open the project directly in Visual Studio — `CMakeSettings.json` includes pre-configured `x64-Debug` and `x64-Release` profiles.
 
+#### Quick Packaging For The Windows bin Directory
+
+If you already built `out/build/x64-Release/bin` with Visual Studio/CMake, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\src\tools\package-windows-bin.ps1
+```
+
+By default the script:
+
+- reads `VERSION.txt` to generate the output folder name
+- copies `out/build/x64-Release/bin` to `out/package/NeurolingsCE_windows_x86_64_v<version>`
+- appends `a` automatically when `VERSION_NAME=Alpha`, for example `NeurolingsCE_windows_x86_64_v0.3.0a`
+- excludes `log/`, `shijima_stdout.txt`, and `shijima_stderr.txt`
+- creates a zip archive for quick sharing or as MSI input
+
+Common options:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\src\tools\package-windows-bin.ps1 `
+  -SourceDir out/build/x64-Release/bin `
+  -OutputRoot out/package `
+  -SkipVcRedist `
+  -SkipZip
+```
+
+#### Windows MSI (WiX)
+
+The repository now also includes a WiX-based MSI entrypoint. Recommended flow:
+
+1. Run `package-windows-bin.ps1` to create a clean staged package directory
+2. Run `installer/wix/build-msi.ps1` to build the MSI
+3. If you want `vc_redist.x64.exe` chained into the install flow, run `installer/wix/build-bundle.ps1` to build the bootstrapper EXE
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\installer\wix\build-msi.ps1
+```
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\installer\wix\build-bundle.ps1
+```
+
+If WiX is not installed yet, you can still generate the `.wxs` files first:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\installer\wix\build-msi.ps1 -GenerateOnly
+```
+
 ### Windows (MinGW Cross-Compilation via Docker)
 
 ```bash
