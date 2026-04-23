@@ -119,6 +119,62 @@
         <source>Speech Bubble Click Count</source>
         <translation>气泡触发点击次数</translation>
     </message>
+    <message>
+        <source>Interaction</source>
+        <translation>交互</translation>
+    </message>
+    <message>
+        <source>Tune how mascots multiply, speak, and respond to your clicks.</source>
+        <translation>调整桌宠分身、气泡和点击反馈相关行为。</translation>
+    </message>
+    <message>
+        <source>Allow mascots to create additional companions.</source>
+        <translation>允许桌宠继续生成分身。</translation>
+    </message>
+    <message>
+        <source>Show mascot dialogue bubbles when interactions trigger them.</source>
+        <translation>在交互触发时显示桌宠对话气泡。</translation>
+    </message>
+    <message>
+        <source>Choose how many clicks are needed before a bubble appears.</source>
+        <translation>设置出现气泡前所需的点击次数。</translation>
+    </message>
+    <message>
+        <source>Edit...</source>
+        <translation>编辑...</translation>
+    </message>
+    <message>
+        <source>Current threshold: %1 px/tick</source>
+        <translation>当前阈值：%1 像素/帧</translation>
+    </message>
+    <message>
+        <source>Display</source>
+        <translation>显示</translation>
+    </message>
+    <message>
+        <source>Adjust the manager presentation, sandbox appearance, and application language.</source>
+        <translation>调整管理器外观、沙盒显示和应用语言。</translation>
+    </message>
+    <message>
+        <source>Keep mascots inside the sandbox window instead of the desktop.</source>
+        <translation>让桌宠停留在沙盒窗口内，而不是桌面上。</translation>
+    </message>
+    <message>
+        <source>Current color: %1</source>
+        <translation>当前颜色：%1</translation>
+    </message>
+    <message>
+        <source>Current scale: %1x</source>
+        <translation>当前缩放：%1x</translation>
+    </message>
+    <message>
+        <source>English</source>
+        <translation>English</translation>
+    </message>
+    <message>
+        <source>Simplified Chinese</source>
+        <translation>简体中文</translation>
+    </message>
     <!-- About page -->
     <message>
         <source>About</source>
@@ -168,6 +224,146 @@
         <source>Close</source>
         <translation>关闭</translation>
     </message>
+    <message>
+        <source>Updates</source>
+        <translation>更新</translation>
+    </message>
+    <message>
+        <source>Control how NeurolingsCE checks GitHub releases and connects to the network.</source>
+        <translation>控制 NeurolingsCE 如何检查 GitHub 发布版本以及如何联网。</translation>
+    </message>
+    <message>
+        <source>Check for Updates on Startup</source>
+        <translation>启动时检查更新</translation>
+    </message>
+    <message>
+        <source>Automatically check GitHub releases when the app launches.</source>
+        <translation>应用启动时自动检查 GitHub 发布版本。</translation>
+    </message>
+    <message>
+        <source>Configure...</source>
+        <translation>配置...</translation>
+    </message>
+    <message>
+        <source>Update Proxy</source>
+        <translation>更新代理</translation>
+    </message>
+    <message>
+        <source>This proxy is only used for GitHub update checks and downloads.</source>
+        <translation>该代理仅用于 GitHub 更新检查和下载。</translation>
+    </message>
+    <message>
+        <source>Use system proxy</source>
+        <translation>使用系统代理</translation>
+    </message>
+    <message>
+        <source>Direct connection</source>
+        <translation>直连</translation>
+    </message>
+    <message>
+        <source>HTTP proxy</source>
+        <translation>HTTP 代理</translation>
+    </message>
+    <message>
+        <source>SOCKS5 proxy</source>
+        <translation>SOCKS5 代理</translation>
+    </message>
+    <message>
+        <source>Mode</source>
+        <translation>模式</translation>
+    </message>
+    <message>
+        <source>Host</source>
+        <translation>主机</translation>
+    </message>
+    <message>
+        <source>Port</source>
+        <translation>端口</translation>
+    </message>
+    <message>
+        <source>Username</source>
+        <translation>用户名</translation>
+    </message>
+    <message>
+        <source>Password</source>
+        <translation>密码</translation>
+    </message>
+    <message>
+        <source>Connect directly without a proxy.</source>
+        <translation>不使用代理，直接连接。</translation>
+    </message>
+    <message>
+        <source>Use the operating system proxy configuration.</source>
+        <translation>使用操作系统中的代理配置。</translation>
+    </message>
+    <message>
+        <source>Manual proxy is enabled, but the host or port is incomplete.</source>
+        <translation>已启用手动代理，但主机或端口未填写完整。</translation>
+    </message>
+    <message>
+        <source>HTTP proxy %1:%2</source>
+        <translation>HTTP 代理 %1:%2</translation>
+    </message>
+    <message>
+        <source>SOCKS5 proxy %1:%2</source>
+        <translation>SOCKS5 代理 %1:%2</translation>
+    </message>
+    <message>
+        <source>Current Version</source>
+        <translation>当前版本</translation>
+    </message>
+    <message>
+        <source>Latest Release</source>
+        <translation>最新发布</translation>
+    </message>
+    <message>
+        <source>Not checked yet</source>
+        <translation>尚未检查</translation>
+    </message>
+    <message>
+        <source>Check for Updates</source>
+        <translation>检查更新</translation>
+    </message>
+    <message>
+        <source>View Release Notes</source>
+        <translation>查看发布说明</translation>
+    </message>
+    <message>
+        <source>Ignore This Version</source>
+        <translation>忽略此版本</translation>
+    </message>
+    <message>
+        <source>Remind Me Later</source>
+        <translation>稍后提醒我</translation>
+    </message>
+    <message>
+        <source>Unavailable</source>
+        <translation>不可用</translation>
+    </message>
+    <message>
+        <source>Update service is unavailable.</source>
+        <translation>更新服务当前不可用。</translation>
+    </message>
+    <message>
+        <source>Install Update</source>
+        <translation>安装更新</translation>
+    </message>
+    <message>
+        <source>Install %1 now? NeurolingsCE will close before the installer starts.</source>
+        <translation>现在安装 %1 吗？NeurolingsCE 会在安装器启动前关闭。</translation>
+    </message>
+    <message>
+        <source>The installer could not be started. You can open the release page and install manually.</source>
+        <translation>无法启动安装器。您可以打开发布页后手动安装。</translation>
+    </message>
+    <message>
+        <source>Update Available</source>
+        <translation>发现更新</translation>
+    </message>
+    <message>
+        <source>NeurolingsCE %1 is available. Click to open the About page.</source>
+        <translation>NeurolingsCE %1 已可用。点击可打开“关于”页面。</translation>
+    </message>
     <!-- Dialogs -->
     <message>
         <source>Delete shimeji</source>
@@ -216,6 +412,197 @@
     <message>
         <source>Do you want to close NeurolingsCE?</source>
         <translation>确定要关闭 NeurolingsCE 吗？</translation>
+    </message>
+</context>
+<context>
+    <name>GitHubUpdateManager</name>
+    <message>
+        <source>Could not create the update cache directory.</source>
+        <translation>无法创建更新缓存目录。</translation>
+    </message>
+    <message>
+        <source>Could not create the versioned update cache directory.</source>
+        <translation>无法创建带版本号的更新缓存目录。</translation>
+    </message>
+    <message>
+        <source>Could not reach GitHub.</source>
+        <translation>无法连接到 GitHub。</translation>
+    </message>
+    <message>
+        <source>Could not open the update file for writing.</source>
+        <translation>无法打开更新文件进行写入。</translation>
+    </message>
+    <message>
+        <source>Check GitHub for the latest NeurolingsCE release.</source>
+        <translation>从 GitHub 检查最新的 NeurolingsCE 发布版本。</translation>
+    </message>
+    <message>
+        <source>Checking GitHub releases...</source>
+        <translation>正在检查 GitHub 发布版本...</translation>
+    </message>
+    <message>
+        <source>You're up to date.</source>
+        <translation>当前已经是最新版本。</translation>
+    </message>
+    <message>
+        <source>This version is currently ignored.</source>
+        <translation>当前版本已被忽略。</translation>
+    </message>
+    <message>
+        <source>This update is snoozed for later.</source>
+        <translation>此更新已延后提醒。</translation>
+    </message>
+    <message>
+        <source>A new version is available.</source>
+        <translation>发现新版本。</translation>
+    </message>
+    <message>
+        <source>A new version is ready to download.</source>
+        <translation>发现新版本，可立即下载。</translation>
+    </message>
+    <message>
+        <source>Downloading update...</source>
+        <translation>正在下载更新...</translation>
+    </message>
+    <message>
+        <source>Update is ready to install.</source>
+        <translation>更新已准备好安装。</translation>
+    </message>
+    <message>
+        <source>Could not complete the update check.</source>
+        <translation>无法完成更新检查。</translation>
+    </message>
+    <message>
+        <source>Current version: %1</source>
+        <translation>当前版本：%1</translation>
+    </message>
+    <message>
+        <source>Latest stable release: %1. Open the release page to download it manually.</source>
+        <translation>最新稳定发布：%1。请打开发布页手动下载。</translation>
+    </message>
+    <message>
+        <source>Latest stable release: %1</source>
+        <translation>最新稳定发布：%1</translation>
+    </message>
+    <message>
+        <source>Downloaded %1 of %2.</source>
+        <translation>已下载 %1，共 %2。</translation>
+    </message>
+    <message>
+        <source>Downloaded %1.</source>
+        <translation>已下载 %1。</translation>
+    </message>
+    <message>
+        <source>Preparing download...</source>
+        <translation>正在准备下载...</translation>
+    </message>
+    <message>
+        <source>The installer has finished downloading.</source>
+        <translation>安装器已下载完成。</translation>
+    </message>
+    <message>
+        <source>Published: %1</source>
+        <translation>发布时间：%1</translation>
+    </message>
+    <message>
+        <source>Downloading...</source>
+        <translation>下载中...</translation>
+    </message>
+    <message>
+        <source>Install Update</source>
+        <translation>安装更新</translation>
+    </message>
+    <message>
+        <source>Download and Install</source>
+        <translation>下载并安装</translation>
+    </message>
+    <message>
+        <source>View Release Notes</source>
+        <translation>查看发布说明</translation>
+    </message>
+    <message>
+        <source>GitHub returned HTTP status %1.</source>
+        <translation>GitHub 返回了 HTTP 状态码 %1。</translation>
+    </message>
+    <message>
+        <source>HTTP %1: %2</source>
+        <translation>HTTP %1：%2</translation>
+    </message>
+    <message>
+        <source>HTTP %1</source>
+        <translation>HTTP %1</translation>
+    </message>
+    <message>
+        <source>Could not write the downloaded update to disk.</source>
+        <translation>无法将下载的更新写入磁盘。</translation>
+    </message>
+    <message>
+        <source>Could not download the installer.</source>
+        <translation>无法下载安装器。</translation>
+    </message>
+    <message>
+        <source>Could not finalize the downloaded installer.</source>
+        <translation>无法完成下载文件的最终保存。</translation>
+    </message>
+    <message>
+        <source>GitHub returned an invalid response.</source>
+        <translation>GitHub 返回了无效响应。</translation>
+    </message>
+    <message>
+        <source>GitHub did not return a stable release.</source>
+        <translation>GitHub 未返回稳定版本发布。</translation>
+    </message>
+    <message>
+        <source>The latest release tag could not be parsed.</source>
+        <translation>无法解析最新发布的标签版本。</translation>
+    </message>
+    <message>
+        <source>TLS backend: %1</source>
+        <translation>TLS 后端：%1</translation>
+    </message>
+    <message>
+        <source>SSL is unavailable in this build.</source>
+        <translation>当前构建不可用 SSL。</translation>
+    </message>
+    <message>
+        <source>Available backends: %1</source>
+        <translation>可用后端：%1</translation>
+    </message>
+    <message>
+        <source>Runtime SSL: %1</source>
+        <translation>运行时 SSL：%1</translation>
+    </message>
+    <message>
+        <source>Build SSL: %1</source>
+        <translation>构建时 SSL：%1</translation>
+    </message>
+    <message>
+        <source>Direct connection</source>
+        <translation>直连</translation>
+    </message>
+    <message>
+        <source>System proxy</source>
+        <translation>系统代理</translation>
+    </message>
+    <message>
+        <source>HTTP proxy %1:%2</source>
+        <translation>HTTP 代理 %1:%2</translation>
+    </message>
+    <message>
+        <source>HTTP proxy</source>
+        <translation>HTTP 代理</translation>
+    </message>
+    <message>
+        <source>SOCKS5 proxy %1:%2</source>
+        <translation>SOCKS5 代理 %1:%2</translation>
+    </message>
+    <message>
+        <source>SOCKS5 proxy</source>
+        <translation>SOCKS5 代理</translation>
+    </message>
+    <message>
+        <source>Custom proxy</source>
+        <translation>自定义代理</translation>
     </message>
 </context>
 <context>
