@@ -44,7 +44,11 @@ class ShijimaWidget : public PlatformWidget<QWidget>
 {
 public:
     friend class ShijimaContextMenu;
-    friend class ShijimaManager;
+    struct TickEnvironmentOverride {
+        bool active = false;
+        double floorY = 0.0;
+        double workAreaBottom = 0.0;
+    };
     explicit ShijimaWidget(MascotData *mascotData,
         std::unique_ptr<shijima::mascot::manager> mascot,
         int mascotId, bool windowedMode, QWidget *parent = nullptr);
@@ -74,6 +78,12 @@ public:
     }
     ~ShijimaWidget();
     bool isFallThroughMode() const { return m_fallThroughMode; }
+    bool dragging() const;
+    void setDragging(bool dragging);
+    TickEnvironmentOverride prepareTickEnvironmentOverride();
+    void restoreTickEnvironmentOverride(TickEnvironmentOverride const& overrideState);
+    void resetFallThroughTrackingIfDragged();
+    void observeFallProgress(double anchorYBefore, double anchorYAfter);
 protected:
     void paintEvent(QPaintEvent *) override;
     void mousePressEvent(QMouseEvent *) override;

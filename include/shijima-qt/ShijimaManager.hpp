@@ -19,22 +19,16 @@
 // 
 
 #include <QString>
-#include <shijima/mascot/manager.hpp>
-#include <shijima/mascot/factory.hpp>
 #include <QList>
 #include <QMap>
 #include <QSet>
-#include <QSettings>
 #include "shijima-qt/PlatformWidget.hpp"
 #include <map>
 #include <memory>
 #include <set>
 #include <list>
 #include <functional>
-#include <mutex>
 #include <optional>
-#include "shijima-qt/ShijimaHttpApi.hpp"
-#include "shijima-qt/ShijimaLocalApi.hpp"
 #include "ElaWindow.h"
 
 class MascotData;
@@ -49,11 +43,14 @@ class QObject;
 class QPoint;
 class QScreen;
 class QShowEvent;
+class QSettings;
 class QTimerEvent;
 class QTranslator;
 class QWidget;
 class ShijimaWidget;
 class GitHubUpdateManager;
+class ShijimaHttpApi;
+class ShijimaLocalApi;
 struct ShijimaManagerRuntimeState;
 struct ShijimaManagerUiState;
 
@@ -77,6 +74,8 @@ public:
     std::set<std::string> import(QString const& path) noexcept;
     void reloadMascots(std::set<std::string> const& mascots);
     bool removeMascotTemplate(QString const& name, QString &errorMessage);
+    // Compatibility facades for legacy UI/API callers. New manager internals
+    // should prefer the runtime stores instead of spreading raw containers.
     QMap<QString, MascotData *> const& loadedMascots();
     QMap<int, MascotData *> const& loadedMascotsById();
     std::list<ShijimaWidget *> const& mascots();
@@ -100,7 +99,6 @@ protected:
     void changeEvent(QEvent *event) override;
 private:
     explicit ShijimaManager(QWidget *parent = nullptr);
-    std::unique_lock<std::mutex> acquireLock();
     void abortPendingCallbacks();
     void shutdownForQuit();
     void loadDefaultMascot();
@@ -128,6 +126,9 @@ private:
     void screenRemoved(QScreen *);
     void importWithDialog(QList<QString> const& paths);
     void tick();
+    bool prepareMascotTick();
+    void tickMascotWidgets();
+    void finishMascotTick();
     void retranslateUi();
     void switchLanguage(const QString &langCode);
     void updateStatusBar();
@@ -136,12 +137,12 @@ private:
     QScreen *mascotScreen();
     std::unique_ptr<ShijimaManagerRuntimeState> m_runtime;
     std::unique_ptr<ShijimaManagerUiState> m_ui;
-    QSettings m_settings;
+    std::unique_ptr<QSettings> m_settings;
     GitHubUpdateManager *m_updateManager = nullptr;
     bool m_allowClose = false;
     bool m_firstShow = true;
     bool m_wasVisible = false;
     bool m_constructing = true;
-    ShijimaHttpApi m_httpApi;
-    ShijimaLocalApi m_localApi;
+    std::unique_ptr<ShijimaHttpApi> m_httpApi;
+    std::unique_ptr<ShijimaLocalApi> m_localApi;
 };

@@ -18,8 +18,12 @@
 
 #pragma once
 
+#include <memory>
+
 #include <QColor>
 #include <QString>
+
+#include "ManagerTrayController.hpp"
 
 class QAction;
 class QLabel;
@@ -44,6 +48,7 @@ struct ShijimaManagerUiState {
     QLabel *mascotDescriptionLabel = nullptr;
     QWidget *homePage = nullptr;
     QWidget *settingsPage = nullptr;
+    std::unique_ptr<ManagerTrayController> trayController;
     QString settingsKey;
     QString aboutKey;
 };

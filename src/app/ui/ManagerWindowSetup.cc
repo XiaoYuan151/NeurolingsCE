@@ -19,6 +19,8 @@
 #include "shijima-qt/ShijimaManager.hpp"
 #include "shijima-qt/AppLog.hpp"
 #include "shijima-qt/MascotPackage.hpp"
+#include "shijima-qt/ShijimaHttpApi.hpp"
+#include "shijima-qt/ShijimaLocalApi.hpp"
 #include "../core/update/GitHubUpdateManager.hpp"
 
 #include "../runtime/ManagerRuntimeState.hpp"
@@ -37,6 +39,7 @@
 #include <QLabel>
 #include <QListWidget>
 #include <QScreen>
+#include <QSettings>
 #include <QStandardPaths>
 #include <QStyleHints>
 #include <QTimer>
@@ -49,9 +52,9 @@ ShijimaManager::ShijimaManager(QWidget *parent):
     PlatformWidget(parent),
     m_runtime(std::make_unique<ShijimaManagerRuntimeState>()),
     m_ui(std::make_unique<ShijimaManagerUiState>()),
-    m_settings("pixelomer", "Shijima-Qt"),
-    m_httpApi(this),
-    m_localApi(this)
+    m_settings(std::make_unique<QSettings>("pixelomer", "Shijima-Qt")),
+    m_httpApi(std::make_unique<ShijimaHttpApi>(this)),
+    m_localApi(std::make_unique<ShijimaLocalApi>(this))
 {
     m_runtime->cliRuntimeMode =
         qApp->property("neurolingsce.cliRuntime").toBool();
@@ -93,7 +96,7 @@ ShijimaManager::ShijimaManager(QWidget *parent):
     MascotPackage::migrateLegacyDirectories(m_runtime->mascotsPath);
     APP_LOG_INFO("startup") << "Mascot storage path=\""
         << m_runtime->mascotsPath.toStdString() << "\"";
-    m_updateManager = new GitHubUpdateManager(&m_settings, this);
+    m_updateManager = new GitHubUpdateManager(m_settings.get(), this);
     connect(m_updateManager, &GitHubUpdateManager::startupUpdateAvailable,
         this, &ShijimaManager::showStartupUpdateNotification);
 
@@ -102,8 +105,9 @@ ShijimaManager::ShijimaManager(QWidget *parent):
     setAcceptDrops(true);
 
     m_runtime->mascotTimer = startTimer(40 / ShijimaManagerRuntimeInternal::kSubtickCount);
-    if (m_runtime->windowObserver.tickFrequency() > 0) {
-        m_runtime->windowObserverTimer = startTimer(m_runtime->windowObserver.tickFrequency());
+    if (m_runtime->environment.windowObserver().tickFrequency() > 0) {
+        m_runtime->windowObserverTimer = startTimer(
+            m_runtime->environment.windowObserver().tickFrequency());
     }
 
     setUserInfoCardVisible(false);
@@ -113,7 +117,7 @@ ShijimaManager::ShijimaManager(QWidget *parent):
     setMinimumHeight(450);
     connect(this, &ElaWindow::closeButtonClicked, this, [this]() {
 #if defined(_WIN32)
-        if (m_runtime->mascots.size() == 0) {
+        if (m_runtime->sessions.empty()) {
             askClose();
         } else {
             setManagerVisible(false);
@@ -150,14 +154,14 @@ ShijimaManager::ShijimaManager(QWidget *parent):
     elaStatusBar->addWidget(m_ui->statusLabel, 1);
     updateStatusBar();
 
-    QString savedLang = m_settings.value("language", "en").toString();
+    QString savedLang = m_settings->value("language", "en").toString();
     if (savedLang != "en") {
         m_ui->currentLanguage = "en";
         switchLanguage(savedLang);
     }
 
-    m_runtime->detachThreshold = m_settings.value("detachThreshold",
-        QVariant::fromValue(30.0)).toDouble();
+    m_runtime->environment.setDetachThreshold(m_settings->value("detachThreshold",
+        QVariant::fromValue(30.0)).toDouble());
 
     if (!m_runtime->cliRuntimeMode) {
         setupNavigation();
@@ -168,11 +172,11 @@ ShijimaManager::ShijimaManager(QWidget *parent):
     m_constructing = false;
 
     if (!m_runtime->cliRuntimeMode) {
-        ShijimaManagerUiInternal::setupTrayIcon(this);
+        ShijimaManagerUiInternal::setupTrayIcon(this, m_ui->trayController);
     }
-    m_localApi.start();
+    m_localApi->start();
     if (!m_runtime->cliRuntimeMode) {
-        m_httpApi.start("127.0.0.1", 32456);
+        m_httpApi->start("127.0.0.1", 32456);
         startStartupUpdateCheck();
     }
     APP_LOG_INFO("startup") << "Manager window initialized";
@@ -197,7 +201,7 @@ void ShijimaManager::changeEvent(QEvent *event) {
         retranslateUi();
     }
     else if (event->type() == QEvent::WindowStateChange) {
-        ShijimaManagerUiInternal::refreshTrayMenu(this);
+        ShijimaManagerUiInternal::refreshTrayMenu(m_ui->trayController.get());
     }
     PlatformWidget::changeEvent(event);
 }
@@ -207,7 +211,7 @@ void ShijimaManager::startStartupUpdateCheck()
     if (m_updateManager == nullptr) {
         return;
     }
-    if (!m_settings.value("update/checkOnStartup", true).toBool()) {
+    if (!m_settings->value("update/checkOnStartup", true).toBool()) {
         return;
     }
 
@@ -224,6 +228,7 @@ void ShijimaManager::showStartupUpdateNotification(QString const& version)
         tr("Update Available"),
         tr("NeurolingsCE %1 is available. Click to open the About page.")
             .arg(QStringLiteral("v%1").arg(version)),
+        m_ui->trayController.get(),
         [this]() {
             setManagerVisible(true);
             showAboutDialog();

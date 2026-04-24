@@ -18,9 +18,12 @@ SOURCES = src/app/main.cc \
 	src/app/core/audio/SoundEffectManager.cc \
 	src/app/core/http/ShijimaHttpApi.cc \
 	src/app/runtime/ManagerEnvironmentSync.cc \
+	src/app/runtime/ManagerEnvironmentController.cc \
 	src/app/runtime/ManagerImportWorkflow.cc \
 	src/app/runtime/ManagerLifecycle.cc \
 	src/app/runtime/ManagerMascotRuntime.cc \
+	src/app/runtime/MascotSessionStore.cc \
+	src/app/runtime/MascotTemplateStore.cc \
 	src/app/ui/ManagerWindowSetup.cc \
 	src/app/ui/mascot/MascotWidgetInteraction.cc \
 	src/app/ui/mascot/MascotWidgetLifecycle.cc \

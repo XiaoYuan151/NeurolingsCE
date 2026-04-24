@@ -1,0 +1,202 @@
+//
+// Shijima-Qt - Cross-platform shimeji simulation app for desktop
+// Copyright (C) 2025 pixelomer
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+//
+
+#include "ManagerEnvironmentController.hpp"
+
+#include "MascotSessionStore.hpp"
+#include "ManagerRuntimeHelpers.hpp"
+#include "shijima-qt/AppLog.hpp"
+#include "shijima-qt/ui/mascot/ShijimaWidget.hpp"
+
+#include <cmath>
+
+#include <QCursor>
+#include <QGuiApplication>
+#include <QScreen>
+#include <QWidget>
+
+Platform::ActiveWindowObserver& ManagerEnvironmentController::windowObserver() {
+    return m_windowObserver;
+}
+
+void ManagerEnvironmentController::setUserScale(double scale) {
+    m_userScale = scale;
+}
+
+void ManagerEnvironmentController::setDetachThreshold(double threshold) {
+    m_detachThreshold = threshold;
+}
+
+void ManagerEnvironmentController::screenAdded(QScreen *screen) {
+    if (m_env.contains(screen)) {
+        return;
+    }
+
+    auto env = std::make_shared<shijima::mascot::environment>();
+    m_env[screen] = env;
+    m_reverseEnv[env.get()] = screen;
+    auto primary = QGuiApplication::primaryScreen();
+    if (screen != primary && m_env.contains(primary)) {
+        m_env[screen]->allows_breeding = m_env[primary]->allows_breeding;
+    }
+}
+
+void ManagerEnvironmentController::screenRemoved(QScreen *screen,
+    QScreen *primaryScreen, MascotSessionStore& sessions)
+{
+    if (!m_env.contains(screen) || screen == nullptr) {
+        return;
+    }
+
+    auto primaryEnv = m_env.value(primaryScreen);
+    for (auto &mascot : sessions.mascots()) {
+        mascot->setEnv(primaryEnv);
+        mascot->mascot().reset_position();
+    }
+    auto removedEnv = m_env.value(screen);
+    if (removedEnv != nullptr) {
+        m_reverseEnv.remove(removedEnv.get());
+    }
+    m_env.remove(screen);
+}
+
+void ManagerEnvironmentController::updateScreen(QScreen *screen,
+    QWidget *sandboxWidget, bool windowedMode)
+{
+    if (!m_env.contains(screen)) {
+        return;
+    }
+
+    auto &env = m_env[screen];
+    QRect geometry, available;
+    QPoint cursor;
+    if (screen == nullptr) {
+        if (sandboxWidget != nullptr) {
+            geometry = sandboxWidget->geometry();
+            cursor = sandboxWidget->cursor().pos() - geometry.topLeft();
+            geometry.setCoords(0, 0, geometry.width(), geometry.height());
+            available = geometry;
+        }
+        else {
+            APP_LOG_WARN("environment") << "Windowed environment requested before sandbox widget was initialized";
+        }
+    }
+    else {
+        cursor = QCursor::pos();
+        geometry = screen->geometry();
+        available = screen->availableGeometry();
+    }
+
+    int taskbarHeight = geometry.bottom() - available.bottom();
+    int statusBarHeight = available.top() - geometry.top();
+    if (taskbarHeight < 0) {
+        taskbarHeight = 0;
+    }
+    if (statusBarHeight < 0) {
+        statusBarHeight = 0;
+    }
+
+    env->screen = { (double)geometry.top() + statusBarHeight,
+        (double)geometry.right(),
+        (double)geometry.bottom(),
+        (double)geometry.left() };
+    env->floor = { (double)geometry.bottom() - taskbarHeight,
+        (double)geometry.left(), (double)geometry.right() };
+    env->work_area = { (double)geometry.top(),
+        (double)geometry.right(),
+        (double)geometry.bottom() - taskbarHeight,
+        (double)geometry.left() };
+    env->ceiling = { (double)geometry.top(), (double)geometry.left(),
+        (double)geometry.right() };
+    if (!windowedMode && m_currentWindow.available &&
+        std::fabs(m_currentWindow.x) > 1 && std::fabs(m_currentWindow.y) > 1)
+    {
+        env->active_ie = { m_currentWindow.y,
+            m_currentWindow.x + m_currentWindow.width,
+            m_currentWindow.y + m_currentWindow.height,
+            m_currentWindow.x };
+        if (m_previousWindow.available &&
+            m_previousWindow.uid == m_currentWindow.uid)
+        {
+            env->active_ie.dy = m_currentWindow.y - m_previousWindow.y;
+            if (env->active_ie.dy == 0) {
+                env->active_ie.dy = m_currentWindow.height - m_previousWindow.height;
+            }
+            env->active_ie.dx = m_currentWindow.x - m_previousWindow.x;
+            if (env->active_ie.dx == 0) {
+                env->active_ie.dx = m_currentWindow.width - m_previousWindow.width;
+            }
+
+            if (m_detachThreshold > 0) {
+                double speed = std::sqrt(env->active_ie.dx * env->active_ie.dx
+                    + env->active_ie.dy * env->active_ie.dy);
+                double upperBound = m_detachThreshold * 3.0;
+                if (speed >= upperBound) {
+                    env->active_ie = { -50, -50, -50, -50 };
+                }
+                else if (speed > m_detachThreshold) {
+                    double ratio = 1.0 - (speed - m_detachThreshold)
+                        / (upperBound - m_detachThreshold);
+                    env->active_ie.dx *= ratio;
+                    env->active_ie.dy *= ratio;
+                }
+            }
+        }
+    }
+    else {
+        env->active_ie = { -50, -50, -50, -50 };
+    }
+
+    int x = cursor.x(), y = cursor.y();
+    env->cursor = { (double)x, (double)y, x - env->cursor.x, y - env->cursor.y };
+    env->subtick_count = ShijimaManagerRuntimeInternal::kSubtickCount;
+    env->set_scale(1.0 / std::sqrt(m_userScale));
+}
+
+void ManagerEnvironmentController::updateAll(QWidget *sandboxWidget,
+    bool windowedMode, QList<QScreen *> const& screens)
+{
+    m_currentWindow = m_windowObserver.getActiveWindow();
+    if (windowedMode) {
+        updateScreen(nullptr, sandboxWidget, windowedMode);
+    }
+    else {
+        for (auto screen : screens) {
+            updateScreen(screen, sandboxWidget, windowedMode);
+        }
+    }
+    m_previousWindow = m_currentWindow;
+}
+
+std::shared_ptr<shijima::mascot::environment>
+ManagerEnvironmentController::environmentForScreen(QScreen *screen) const
+{
+    return m_env.value(screen);
+}
+
+QScreen *ManagerEnvironmentController::screenForEnvironment(
+    shijima::mascot::environment *environment) const
+{
+    return m_reverseEnv.value(environment, nullptr);
+}
+
+void ManagerEnvironmentController::resetScales() {
+    for (auto &env : m_env) {
+        env->reset_scale();
+    }
+}

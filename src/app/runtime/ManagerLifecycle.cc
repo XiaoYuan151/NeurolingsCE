@@ -17,6 +17,8 @@
 //
 
 #include "shijima-qt/ShijimaManager.hpp"
+#include "shijima-qt/ShijimaHttpApi.hpp"
+#include "shijima-qt/ShijimaLocalApi.hpp"
 
 #include "ManagerRuntimeState.hpp"
 #include "../ui/ManagerUiState.hpp"
@@ -28,6 +30,7 @@
 #include <QCoreApplication>
 #include <QGuiApplication>
 #include <QMetaObject>
+#include <QSettings>
 #include <QThread>
 
 static ShijimaManager *m_defaultManager = nullptr;
@@ -46,10 +49,6 @@ void ShijimaManager::finalize() {
     }
 }
 
-std::unique_lock<std::mutex> ShijimaManager::acquireLock() {
-    return std::unique_lock<std::mutex> { m_runtime->mutex };
-}
-
 QString const& ShijimaManager::mascotsPath() {
     return m_runtime->mascotsPath;
 }
@@ -62,16 +61,12 @@ ShijimaManager::~ShijimaManager() {
 }
 
 void ShijimaManager::abortPendingCallbacks() {
-    auto lock = acquireLock();
     m_runtime->shuttingDown.store(true);
-    m_runtime->tickCallbacks.clear();
-    m_runtime->hasTickCallbacks = false;
-    m_runtime->tickCallbackCompletion.notify_all();
 }
 
 void ShijimaManager::shutdownForQuit() {
     abortPendingCallbacks();
-    ShijimaManagerUiInternal::teardownTrayIcon();
+    ShijimaManagerUiInternal::teardownTrayIcon(m_ui->trayController);
 
     if (m_runtime->mascotTimer > 0) {
         killTimer(m_runtime->mascotTimer);
@@ -82,10 +77,10 @@ void ShijimaManager::shutdownForQuit() {
         m_runtime->windowObserverTimer = 0;
     }
 
-    m_localApi.stop();
-    m_httpApi.stop();
+    m_localApi->stop();
+    m_httpApi->stop();
 
-    for (auto mascot : m_runtime->mascots) {
+    for (auto mascot : m_runtime->sessions.mascots()) {
         if (mascot == nullptr) {
             continue;
         }
@@ -94,11 +89,7 @@ void ShijimaManager::shutdownForQuit() {
         mascot->close();
         delete mascot;
     }
-    m_runtime->mascots.clear();
-    m_runtime->mascotsById.clear();
-    m_runtime->cliLabelToMascotId.clear();
-    m_runtime->cliLabelByMascotId.clear();
-    m_runtime->nextCliLabel = 0;
+    m_runtime->sessions.clear();
 
     if (m_ui->sandboxWidget != nullptr) {
         m_ui->sandboxWidget->close();
@@ -117,6 +108,8 @@ void ShijimaManager::onTickSync(std::function<void(ShijimaManager *)> callback) 
         return;
     }
 
+    // HTTP and Local IPC callbacks run on worker threads; mascot state belongs
+    // to the Qt GUI thread, so mutations are marshalled here synchronously.
     QMetaObject::invokeMethod(this, [this, callback]() {
         if (!m_runtime->shuttingDown.load()) {
             callback(this);
@@ -129,7 +122,7 @@ void ShijimaManager::closeEvent(QCloseEvent *event) {
     if (!m_allowClose) {
         event->ignore();
 #if defined(_WIN32)
-        if (m_runtime->mascots.size() == 0) {
+        if (m_runtime->sessions.empty()) {
             askClose();
         }
         else {
@@ -158,6 +151,6 @@ void ShijimaManager::timerEvent(QTimerEvent *event) {
         tick();
     }
     else if (timerId == m_runtime->windowObserverTimer) {
-        m_runtime->windowObserver.tick();
+        m_runtime->environment.windowObserver().tick();
     }
 }

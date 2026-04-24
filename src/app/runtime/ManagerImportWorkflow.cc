@@ -105,7 +105,7 @@ void ShijimaManager::showEvent(QShowEvent *event) {
         m_runtime->importOnShowPath = {};
         importWithDialog({ path });
     }
-    else if (m_runtime->loadedMascots.size() == 1) {
+    else if (m_runtime->templates.loadedMascots().size() == 1) {
         auto msgBox = new QMessageBox { this };
         msgBox->setText(tr("Welcome to NeurolingsCE! Get started by dragging and dropping a "
             "shimeji archive to the manager window. You can also import archives "

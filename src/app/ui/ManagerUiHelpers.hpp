@@ -19,20 +19,23 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 #include <QString>
 
 class QColor;
 class QListWidget;
+class ManagerTrayController;
 class ShijimaManager;
 
 namespace ShijimaManagerUiInternal {
 
 QString colorToString(QColor const& color);
 void applyMascotListTheme(QListWidget& listWidget);
-void refreshTrayMenu(ShijimaManager *manager);
-void setupTrayIcon(ShijimaManager *manager);
-void teardownTrayIcon();
+void refreshTrayMenu(ManagerTrayController *controller);
+void setupTrayIcon(ShijimaManager *manager,
+    std::unique_ptr<ManagerTrayController>& controller);
+void teardownTrayIcon(std::unique_ptr<ManagerTrayController>& controller);
 void showTrayMessage(QString const& title, QString const& message,
-    std::function<void()> onClick = {});
+    ManagerTrayController *controller, std::function<void()> onClick = {});
 
 }

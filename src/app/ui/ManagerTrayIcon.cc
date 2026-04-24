@@ -18,18 +18,17 @@
 
 #include "shijima-qt/ShijimaManager.hpp"
 #include "ManagerUiHelpers.hpp"
+#include "ManagerTrayController.hpp"
 #include <functional>
+#include <memory>
 #include <QApplication>
 #include <QCoreApplication>
 #include <QMenu>
+#include <QMetaObject>
 #include <QStyle>
 #include <QSystemTrayIcon>
 
 namespace {
-
-QSystemTrayIcon *g_trayIcon = nullptr;
-QMenu *g_trayMenu = nullptr;
-std::function<void()> g_messageClickHandler;
 
 QIcon makeTrayIconFallback(QWidget *widget) {
     QIcon ico { QStringLiteral(":/neurolingsce.ico") };
@@ -68,32 +67,83 @@ QIcon makeTrayIconFallback(QWidget *widget) {
 
 }
 
-namespace ShijimaManagerUiInternal {
+ManagerTrayController::ManagerTrayController(ShijimaManager *manager):
+    QObject(manager),
+    m_manager(manager)
+{
+    m_trayIcon = new QSystemTrayIcon(this);
+    m_trayIcon->setToolTip(QCoreApplication::translate("ShijimaManager", APP_NAME));
+    m_trayIcon->setIcon(makeTrayIconFallback(manager));
 
-void refreshTrayMenu(ShijimaManager *manager) {
-    if (g_trayMenu == nullptr || manager == nullptr) {
+    m_trayMenu = new QMenu(manager);
+    m_trayIcon->setContextMenu(m_trayMenu);
+    refreshMenu();
+
+    QObject::connect(m_trayIcon, &QSystemTrayIcon::activated,
+        [this](QSystemTrayIcon::ActivationReason reason) {
+            if (reason == QSystemTrayIcon::Trigger || reason == QSystemTrayIcon::DoubleClick) {
+                m_manager->setManagerVisible(!m_manager->isVisible());
+                refreshMenu();
+            }
+        });
+    QObject::connect(m_trayIcon, &QSystemTrayIcon::messageClicked,
+        m_manager, [this]() {
+            if (!m_messageClickHandler) {
+                return;
+            }
+            auto handler = m_messageClickHandler;
+            m_messageClickHandler = {};
+            handler();
+        });
+
+    m_trayIcon->show();
+}
+
+ManagerTrayController::~ManagerTrayController() {
+    // The controller is owned by the manager UI state. Clear click handlers
+    // before deleting tray objects so stale notifications cannot call back.
+    m_messageClickHandler = {};
+    if (m_trayIcon != nullptr) {
+        m_trayIcon->hide();
+        m_trayIcon->setContextMenu(nullptr);
+        delete m_trayIcon;
+        m_trayIcon = nullptr;
+    }
+    if (m_trayMenu != nullptr) {
+        m_trayMenu->hide();
+        delete m_trayMenu;
+        m_trayMenu = nullptr;
+    }
+}
+
+bool ManagerTrayController::isAvailable() {
+    return QSystemTrayIcon::isSystemTrayAvailable();
+}
+
+void ManagerTrayController::refreshMenu() {
+    if (m_trayMenu == nullptr || m_manager == nullptr) {
         return;
     }
 
-    g_trayMenu->clear();
+    m_trayMenu->clear();
 
-    QAction *toggleAction = g_trayMenu->addAction(
-        manager->isVisible()
+    QAction *toggleAction = m_trayMenu->addAction(
+        m_manager->isVisible()
             ? QCoreApplication::translate("ShijimaManager", "Hide")
             : QCoreApplication::translate("ShijimaManager", "Show"));
-    QObject::connect(toggleAction, &QAction::triggered, [manager]() {
-        manager->setManagerVisible(!manager->isVisible());
-        refreshTrayMenu(manager);
+    QObject::connect(toggleAction, &QAction::triggered, [this]() {
+        m_manager->setManagerVisible(!m_manager->isVisible());
+        refreshMenu();
     });
 
-    QMenu *spawnMenu = g_trayMenu->addMenu(
+    QMenu *spawnMenu = m_trayMenu->addMenu(
         QCoreApplication::translate("ShijimaManager", "Spawn"));
-    auto names = manager->loadedMascots().keys();
+    auto names = m_manager->loadedMascots().keys();
     names.sort(Qt::CaseInsensitive);
     for (auto const& name : names) {
         QAction *action = spawnMenu->addAction(name);
-        QObject::connect(action, &QAction::triggered, [manager, name]() {
-            manager->spawn(name.toStdString());
+        QObject::connect(action, &QAction::triggered, [this, name]() {
+            m_manager->spawn(name.toStdString());
         });
     }
     if (names.isEmpty()) {
@@ -102,82 +152,65 @@ void refreshTrayMenu(ShijimaManager *manager) {
         empty->setEnabled(false);
     }
 
-    g_trayMenu->addSeparator();
+    m_trayMenu->addSeparator();
 
-    QAction *killAllAction = g_trayMenu->addAction(
+    QAction *killAllAction = m_trayMenu->addAction(
         QCoreApplication::translate("ShijimaManager", "Kill all"));
-    QObject::connect(killAllAction, &QAction::triggered, [manager]() {
-        manager->killAll();
+    QObject::connect(killAllAction, &QAction::triggered, [this]() {
+        m_manager->killAll();
     });
 
-    QAction *quitAction = g_trayMenu->addAction(
+    QAction *quitAction = m_trayMenu->addAction(
         QCoreApplication::translate("ShijimaManager", "Quit"));
-    QObject::connect(quitAction, &QAction::triggered, [manager]() {
+    QObject::connect(quitAction, &QAction::triggered, [manager = m_manager]() {
         QMetaObject::invokeMethod(manager, [manager]() {
             manager->quitAction();
         }, Qt::QueuedConnection);
     });
 }
 
-void setupTrayIcon(ShijimaManager *manager) {
-    if (manager == nullptr || !QSystemTrayIcon::isSystemTrayAvailable()) {
+void ManagerTrayController::showMessage(QString const& title,
+    QString const& message, std::function<void()> onClick)
+{
+    if (m_trayIcon == nullptr) {
         return;
     }
-    if (g_trayIcon != nullptr) {
-        return;
-    }
 
-    g_trayIcon = new QSystemTrayIcon(manager);
-    g_trayIcon->setToolTip(QCoreApplication::translate("ShijimaManager", APP_NAME));
-    g_trayIcon->setIcon(makeTrayIconFallback(manager));
-
-    g_trayMenu = new QMenu(manager);
-    g_trayIcon->setContextMenu(g_trayMenu);
-    refreshTrayMenu(manager);
-
-    QObject::connect(g_trayIcon, &QSystemTrayIcon::activated,
-        [manager](QSystemTrayIcon::ActivationReason reason) {
-            if (reason == QSystemTrayIcon::Trigger || reason == QSystemTrayIcon::DoubleClick) {
-                manager->setManagerVisible(!manager->isVisible());
-                refreshTrayMenu(manager);
-            }
-        });
-    QObject::connect(g_trayIcon, &QSystemTrayIcon::messageClicked, manager, []() {
-        if (!g_messageClickHandler) {
-            return;
-        }
-        auto handler = g_messageClickHandler;
-        g_messageClickHandler = {};
-        handler();
-    });
-
-    g_trayIcon->show();
+    m_messageClickHandler = std::move(onClick);
+    m_trayIcon->showMessage(title, message, QSystemTrayIcon::Information, 10000);
 }
 
-void teardownTrayIcon() {
-    if (g_trayIcon != nullptr) {
-        g_trayIcon->hide();
-        g_trayIcon->setContextMenu(nullptr);
-        g_trayIcon->deleteLater();
-        g_trayIcon = nullptr;
+namespace ShijimaManagerUiInternal {
+
+void refreshTrayMenu(ManagerTrayController *controller) {
+    if (controller != nullptr) {
+        controller->refreshMenu();
     }
-    if (g_trayMenu != nullptr) {
-        g_trayMenu->hide();
-        g_trayMenu->deleteLater();
-        g_trayMenu = nullptr;
+}
+
+void setupTrayIcon(ShijimaManager *manager,
+    std::unique_ptr<ManagerTrayController>& controller)
+{
+    if (manager == nullptr || !ManagerTrayController::isAvailable()) {
+        return;
     }
-    g_messageClickHandler = {};
+    if (controller != nullptr) {
+        return;
+    }
+
+    controller = std::make_unique<ManagerTrayController>(manager);
 }
 
 void showTrayMessage(QString const& title, QString const& message,
-    std::function<void()> onClick)
+    ManagerTrayController *controller, std::function<void()> onClick)
 {
-    if (g_trayIcon == nullptr) {
-        return;
+    if (controller != nullptr) {
+        controller->showMessage(title, message, std::move(onClick));
     }
+}
 
-    g_messageClickHandler = std::move(onClick);
-    g_trayIcon->showMessage(title, message, QSystemTrayIcon::Information, 10000);
+void teardownTrayIcon(std::unique_ptr<ManagerTrayController>& controller) {
+    controller.reset();
 }
 
 }

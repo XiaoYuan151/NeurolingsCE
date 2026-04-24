@@ -25,6 +25,7 @@
 #include "../ui/ManagerUiState.hpp"
 #include "../ui/ManagerUiHelpers.hpp"
 #include <filesystem>
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <QDir>
@@ -39,57 +40,27 @@
 using namespace shijima;
 
 void ShijimaManager::killAll() {
-    for (auto mascot : m_runtime->mascots) {
-        mascot->markForDeletion();
-    }
+    m_runtime->sessions.markAllForDeletion();
 }
 
 void ShijimaManager::killAll(QString const& name) {
-    for (auto mascot : m_runtime->mascots) {
-        if (mascot->mascotName() == name) {
-            mascot->markForDeletion();
-        }
-    }
+    m_runtime->sessions.markAllForDeletion(name);
 }
 
 void ShijimaManager::killAllButOne(ShijimaWidget *widget) {
-    for (auto mascot : m_runtime->mascots) {
-        if (widget == mascot) {
-            continue;
-        }
-        mascot->markForDeletion();
-    }
+    m_runtime->sessions.markAllButOneForDeletion(widget);
 }
 
 void ShijimaManager::killAllButOne(QString const& name) {
-    bool foundOne = false;
-    for (auto mascot : m_runtime->mascots) {
-        if (mascot->mascotName() == name) {
-            if (!foundOne) {
-                foundOne = true;
-                continue;
-            }
-            mascot->markForDeletion();
-        }
-    }
+    m_runtime->sessions.markAllButOneForDeletion(name);
 }
 
 void ShijimaManager::loadData(MascotData *data) {
-    if (data == nullptr || !data->valid()) {
-        throw std::runtime_error("loadData() called with invalid data");
-    }
-
-    shijima::mascot::factory::tmpl tmpl;
-    tmpl.actions_xml = data->actionsXML().toStdString();
-    tmpl.behaviors_xml = data->behaviorsXML().toStdString();
-    tmpl.name = data->name().toStdString();
-    tmpl.path = data->path().toStdString();
-    m_runtime->factory.register_template(tmpl);
-    m_runtime->loadedMascots.insert(data->name(), data);
-    m_runtime->loadedMascotsById.insert(data->id(), data);
+    auto *loaded = m_runtime->templates.registerTemplate(
+        std::unique_ptr<MascotData>(data));
     APP_LOG_INFO("mascot") << "Loaded mascot template name=\""
-        << data->name().toStdString() << "\" id=" << data->id()
-        << " path=\"" << data->path().toStdString() << "\"";
+        << loaded->name().toStdString() << "\" id=" << loaded->id()
+        << " path=\"" << loaded->path().toStdString() << "\"";
 }
 
 void ShijimaManager::loadDefaultMascot() {
@@ -98,97 +69,47 @@ void ShijimaManager::loadDefaultMascot() {
 }
 
 QMap<QString, MascotData *> const& ShijimaManager::loadedMascots() {
-    return m_runtime->loadedMascots;
+    return m_runtime->templates.loadedMascots();
 }
 
 QMap<int, MascotData *> const& ShijimaManager::loadedMascotsById() {
-    return m_runtime->loadedMascotsById;
+    return m_runtime->templates.loadedMascotsById();
 }
 
 std::list<ShijimaWidget *> const& ShijimaManager::mascots() {
-    return m_runtime->mascots;
+    return m_runtime->sessions.mascots();
 }
 
 std::map<int, ShijimaWidget *> const& ShijimaManager::mascotsById() {
-    return m_runtime->mascotsById;
+    return m_runtime->sessions.mascotsById();
 }
 
 std::optional<int> ShijimaManager::cliLabelForMascot(int mascotId) const {
-    auto it = m_runtime->cliLabelByMascotId.constFind(mascotId);
-    if (it == m_runtime->cliLabelByMascotId.cend()) {
-        return std::nullopt;
-    }
-    return it.value();
+    return m_runtime->sessions.cliLabelForMascot(mascotId);
 }
 
 std::optional<int> ShijimaManager::mascotIdForCliLabel(int cliLabel) const {
-    auto it = m_runtime->cliLabelToMascotId.constFind(cliLabel);
-    if (it == m_runtime->cliLabelToMascotId.cend()) {
-        return std::nullopt;
-    }
-    return it.value();
+    return m_runtime->sessions.mascotIdForCliLabel(cliLabel);
 }
 
 bool ShijimaManager::assignCliLabel(int mascotId,
     std::optional<int> preferredLabel, int &assignedLabel, QString &errorMessage)
 {
-    if (m_runtime->mascotsById.count(mascotId) != 1) {
-        errorMessage = QStringLiteral("No such mascot");
-        return false;
-    }
-    if (auto existing = cliLabelForMascot(mascotId); existing.has_value()) {
-        if (!preferredLabel.has_value() || preferredLabel.value() == existing.value()) {
-            assignedLabel = existing.value();
-            return true;
-        }
-        errorMessage = QStringLiteral("Mascot already has a different CLI label");
-        return false;
-    }
-
-    int label = -1;
-    if (preferredLabel.has_value()) {
-        label = preferredLabel.value();
-        if (label < 0) {
-            errorMessage = QStringLiteral("CLI label must be greater than or equal to 0");
-            return false;
-        }
-        if (m_runtime->cliLabelToMascotId.contains(label)) {
-            errorMessage = QStringLiteral("CLI label is already in use");
-            return false;
-        }
-    }
-    else {
-        label = m_runtime->nextCliLabel;
-        while (m_runtime->cliLabelToMascotId.contains(label)) {
-            ++label;
-        }
-        m_runtime->nextCliLabel = label + 1;
-    }
-
-    m_runtime->cliLabelToMascotId[label] = mascotId;
-    m_runtime->cliLabelByMascotId[mascotId] = label;
-    assignedLabel = label;
-    return true;
+    return m_runtime->sessions.assignCliLabel(mascotId, preferredLabel,
+        assignedLabel, errorMessage);
 }
 
 void ShijimaManager::clearCliLabelForMascot(int mascotId) {
-    auto it = m_runtime->cliLabelByMascotId.find(mascotId);
-    if (it == m_runtime->cliLabelByMascotId.end()) {
-        return;
-    }
-    int cliLabel = it.value();
-    m_runtime->cliLabelByMascotId.erase(it);
-    m_runtime->cliLabelToMascotId.remove(cliLabel);
+    m_runtime->sessions.clearCliLabelForMascot(mascotId);
 }
 
 void ShijimaManager::clearCliLabels() {
-    m_runtime->cliLabelToMascotId.clear();
-    m_runtime->cliLabelByMascotId.clear();
-    m_runtime->nextCliLabel = 0;
+    m_runtime->sessions.clearCliLabels();
 }
 
 void ShijimaManager::reloadMascot(QString const& name) {
-    if (m_runtime->loadedMascots.contains(name) && !m_runtime->loadedMascots[name]->deletable()) {
+    auto *loadedData = m_runtime->templates.loadedMascots().value(name, nullptr);
+    if (loadedData != nullptr && !loadedData->deletable()) {
         APP_LOG_WARN("mascot") << "Refusing to unload non-deletable mascot template name=\""
             << name.toStdString() << "\"";
         return;
@@ -207,14 +128,12 @@ void ShijimaManager::reloadMascot(QString const& name) {
             << name.toStdString() << "\": " << ex.what();
     }
 
-    if (m_runtime->loadedMascots.contains(name)) {
-        MascotData *oldData = m_runtime->loadedMascots[name];
-        m_runtime->factory.deregister_template(name.toStdString());
-        oldData->unloadCache();
+    if (m_runtime->templates.loadedMascots().contains(name)) {
+        auto oldData = m_runtime->templates.takeTemplate(name);
+        if (oldData != nullptr) {
+            oldData->unloadCache();
+        }
         killAll(name);
-        m_runtime->loadedMascots.remove(name);
-        m_runtime->loadedMascotsById.remove(oldData->id());
-        delete oldData;
         APP_LOG_INFO("mascot") << "Unloaded mascot template name=\""
             << name.toStdString() << "\"";
     }
@@ -227,7 +146,7 @@ void ShijimaManager::reloadMascot(QString const& name) {
     }
 
     m_runtime->listItemsToRefresh.insert(name);
-    ShijimaManagerUiInternal::refreshTrayMenu(this);
+    ShijimaManagerUiInternal::refreshTrayMenu(m_ui->trayController.get());
 }
 
 void ShijimaManager::refreshListWidget() {
@@ -237,12 +156,12 @@ void ShijimaManager::refreshListWidget() {
     }
 
     m_ui->listWidget->clear();
-    auto names = m_runtime->loadedMascots.keys();
+    auto names = m_runtime->templates.loadedMascots().keys();
     names.sort(Qt::CaseInsensitive);
     for (auto &name : names) {
         auto item = new QListWidgetItem;
         item->setText(name);
-        auto *data = m_runtime->loadedMascots[name];
+        auto *data = m_runtime->templates.loadedMascots()[name];
         item->setIcon(data->preview());
         item->setSizeHint(QSize(0, 72));
         QStringList tooltip;
@@ -312,9 +231,9 @@ void ShijimaManager::syncMascotLibrary() {
         mascotsOnDisk.insert(metadata.name);
     }
 
-    auto loadedNames = m_runtime->loadedMascots.keys();
+    auto loadedNames = m_runtime->templates.loadedMascots().keys();
     for (auto const& name : loadedNames) {
-        auto *data = m_runtime->loadedMascots.value(name, nullptr);
+        auto *data = m_runtime->templates.loadedMascots().value(name, nullptr);
         if (data == nullptr || !data->deletable()) {
             continue;
         }
@@ -340,12 +259,12 @@ void ShijimaManager::reloadMascots(std::set<std::string> const& mascots) {
 bool ShijimaManager::removeMascotTemplate(QString const& name,
     QString &errorMessage)
 {
-    if (!m_runtime->loadedMascots.contains(name)) {
+    if (!m_runtime->templates.loadedMascots().contains(name)) {
         errorMessage = QStringLiteral("No such mascot template");
         return false;
     }
 
-    auto *mascotData = m_runtime->loadedMascots[name];
+    auto *mascotData = m_runtime->templates.loadedMascots()[name];
     if (mascotData == nullptr) {
         errorMessage = QStringLiteral("No such mascot template");
         return false;
@@ -373,101 +292,63 @@ bool ShijimaManager::removeMascotTemplate(QString const& name,
     return true;
 }
 
-void ShijimaManager::tick() {
-    if (m_runtime->hasTickCallbacks) {
-        auto lock = acquireLock();
-        for (auto &callback : m_runtime->tickCallbacks) {
-            callback(this);
-        }
-        m_runtime->tickCallbacks.clear();
-        m_runtime->hasTickCallbacks = false;
-        m_runtime->tickCallbackCompletion.notify_all();
-    }
-
+bool ShijimaManager::prepareMascotTick() {
     if (m_ui->sandboxWidget != nullptr && !m_ui->sandboxWidget->isVisible()) {
         setWindowedMode(false);
 #if !defined(__APPLE__)
-        if (m_runtime->mascots.size() == 0 && !m_runtime->cliRuntimeMode) {
+        if (m_runtime->sessions.empty() && !m_runtime->cliRuntimeMode) {
             setManagerVisible(true);
         }
 #endif
     }
 
-    if (m_runtime->mascots.size() == 0) {
+    if (m_runtime->sessions.empty()) {
 #if !defined(__APPLE__)
         if (!windowedMode() && !m_wasVisible && !m_runtime->cliRuntimeMode) {
             setManagerVisible(true);
         }
 #endif
-        return;
+        return false;
     }
 
-    updateEnvironment();
+    return true;
+}
 
-    for (auto iter = m_runtime->mascots.end(); iter != m_runtime->mascots.begin(); ) {
+void ShijimaManager::tickMascotWidgets() {
+    auto &sessions = m_runtime->sessions;
+    for (auto iter = sessions.mascots().end(); iter != sessions.mascots().begin(); ) {
         --iter;
         ShijimaWidget *shimeji = *iter;
         if (!shimeji->isVisible()) {
             int mascotId = shimeji->mascotId();
-            clearCliLabelForMascot(mascotId);
             delete shimeji;
             auto erasePos = iter;
             ++iter;
-            m_runtime->mascots.erase(erasePos);
-            m_runtime->mascotsById.erase(mascotId);
+            sessions.mascots().erase(erasePos);
+            sessions.removeIndex(mascotId);
             continue;
         }
 
-        double savedFloorY = 0.0;
-        bool didOverrideFloor = false;
-        if (shimeji->isFallThroughMode()) {
-            savedFloorY = shimeji->env()->floor.y;
-            shimeji->env()->floor.y = shimeji->env()->screen.bottom;
-            shimeji->env()->work_area.bottom = shimeji->env()->screen.bottom;
-            didOverrideFloor = true;
-        }
-
+        auto envOverride = shimeji->prepareTickEnvironmentOverride();
         double anchorYBefore = shimeji->mascot().state->anchor.y;
         shimeji->tick();
-
-        if (didOverrideFloor) {
-            shimeji->env()->floor.y = savedFloorY;
-            shimeji->env()->work_area.bottom = savedFloorY;
-        }
+        shimeji->restoreTickEnvironmentOverride(envOverride);
 
         if (!windowedMode()) {
             double anchorYAfter = shimeji->mascot().state->anchor.y;
-            bool onLand = shimeji->mascot().state->on_land();
-            bool isDragging = shimeji->mascot().state->dragging;
-
-            if (isDragging && shimeji->isFallThroughMode()) {
-                shimeji->m_fallThroughMode = false;
-                shimeji->m_fallTracking = false;
-            }
-
-            if (!onLand && !isDragging && anchorYAfter > anchorYBefore) {
-                if (!shimeji->m_fallTracking) {
-                    shimeji->m_fallTracking = true;
-                    shimeji->m_fallStartY = anchorYBefore;
-                }
-                double fallDistance = anchorYAfter - shimeji->m_fallStartY;
-                if (fallDistance >= 700.0) {
-                    shimeji->m_fallThroughMode = true;
-                }
-            }
-            else {
-                shimeji->m_fallTracking = false;
-            }
+            shimeji->resetFallThroughTrackingIfDragged();
+            shimeji->observeFallProgress(anchorYBefore, anchorYAfter);
         }
 
         auto &mascot = shimeji->mascot();
         auto &breedRequest = mascot.state->breed_request;
         if (mascot.state->dragging && !windowedMode()) {
-            auto oldScreen = m_runtime->reverseEnv[mascot.state->env.get()];
+            auto oldScreen = m_runtime->environment.screenForEnvironment(
+                mascot.state->env.get());
             auto newScreen = QGuiApplication::screenAt(QPoint {
                 (int)mascot.state->anchor.x, (int)mascot.state->anchor.y });
             if (newScreen != nullptr && oldScreen != newScreen) {
-                mascot.state->env = m_runtime->env[newScreen];
+                mascot.state->env = m_runtime->environment.environmentForScreen(newScreen);
             }
         }
         if (breedRequest.available) {
@@ -479,7 +360,7 @@ void ShijimaManager::tick() {
 
             std::optional<shijima::mascot::factory::product> product;
             try {
-                product = m_runtime->factory.spawn(breedRequest);
+                product = m_runtime->templates.factory().spawn(breedRequest);
             }
             catch (std::exception &ex) {
                 APP_LOG_ERROR("mascot") << "Failed to fulfill breed request name=\""
@@ -488,23 +369,22 @@ void ShijimaManager::tick() {
 
             if (product.has_value()) {
                 ShijimaWidget *child = new ShijimaWidget(
-                    m_runtime->loadedMascots[QString::fromStdString(breedRequest.name)],
+                    m_runtime->templates.loadedMascots()[QString::fromStdString(breedRequest.name)],
                     std::move(product->manager), m_runtime->idCounter++,
                     windowedMode(), mascotParent());
                 child->setEnv(shimeji->env());
                 child->show();
-                m_runtime->mascots.push_back(child);
-                m_runtime->mascotsById[child->mascotId()] = child;
+                m_runtime->sessions.add(child);
             }
             breedRequest.available = false;
         }
     }
+}
 
-    for (auto &env : m_runtime->env) {
-        env->reset_scale();
-    }
+void ShijimaManager::finishMascotTick() {
+    m_runtime->environment.resetScales();
 
-    if (m_runtime->mascots.size() == 0 && !windowedMode() &&
+    if (m_runtime->sessions.empty() && !windowedMode() &&
         !m_runtime->cliRuntimeMode)
     {
         setManagerVisible(true);
@@ -513,8 +393,18 @@ void ShijimaManager::tick() {
     updateStatusBar();
 }
 
+void ShijimaManager::tick() {
+    if (!prepareMascotTick()) {
+        return;
+    }
+
+    updateEnvironment();
+    tickMascotWidgets();
+    finishMascotTick();
+}
+
 ShijimaWidget *ShijimaManager::hitTest(QPoint const& screenPos) {
-    for (auto mascot : m_runtime->mascots) {
+    for (auto mascot : m_runtime->sessions.mascots()) {
         QPoint localPos = { screenPos.x() - mascot->x(),
             screenPos.y() - mascot->y() };
         if (mascot->pointInside(localPos)) {
@@ -530,17 +420,16 @@ ShijimaWidget *ShijimaManager::spawn(std::string const& name) {
     try {
         QScreen *screen = mascotScreen();
         updateEnvironment(screen);
-        auto &env = m_runtime->env[screen];
-        auto product = m_runtime->factory.spawn(name, {});
+        auto env = m_runtime->environment.environmentForScreen(screen);
+        auto product = m_runtime->templates.factory().spawn(name, {});
         product.manager->state->env = env;
         product.manager->reset_position();
         ShijimaWidget *shimeji = new ShijimaWidget(
-            m_runtime->loadedMascots[QString::fromStdString(name)],
+            m_runtime->templates.loadedMascots()[QString::fromStdString(name)],
             std::move(product.manager), m_runtime->idCounter++,
             windowedMode(), mascotParent());
         shimeji->show();
-        m_runtime->mascots.push_back(shimeji);
-        m_runtime->mascotsById[shimeji->mascotId()] = shimeji;
+        m_runtime->sessions.add(shimeji);
         env->reset_scale();
         APP_LOG_INFO("mascot") << "Spawn succeeded for template name=\"" << name
             << "\" mascotId=" << shimeji->mascotId();
@@ -558,7 +447,7 @@ ShijimaWidget *ShijimaManager::spawn(std::string const& name) {
 }
 
 void ShijimaManager::spawnClicked() {
-    auto &allTemplates = m_runtime->factory.get_all_templates();
+    auto &allTemplates = m_runtime->templates.factory().get_all_templates();
     int target = QRandomGenerator::global()->bounded((int)allTemplates.size());
     int i = 0;
     for (auto &pair : allTemplates) {

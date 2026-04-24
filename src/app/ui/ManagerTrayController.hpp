@@ -1,3 +1,5 @@
+#pragma once
+
 //
 // Shijima-Qt - Cross-platform shimeji simulation app for desktop
 // Copyright (C) 2025 pixelomer
@@ -16,32 +18,28 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //
 
-#pragma once
+#include <functional>
 
-#include <atomic>
-#include <memory>
-#include <set>
-#include <QSet>
+#include <QObject>
 #include <QString>
-#include "ManagerEnvironmentController.hpp"
-#include "MascotTemplateStore.hpp"
-#include "MascotSessionStore.hpp"
 
-class MascotData;
-class QScreen;
-class ShijimaWidget;
+class QMenu;
+class QSystemTrayIcon;
+class ShijimaManager;
 
-struct ShijimaManagerRuntimeState {
-    ManagerEnvironmentController environment;
-    int mascotTimer = -1;
-    int windowObserverTimer = -1;
-    int idCounter = 0;
-    MascotTemplateStore templates;
-    QSet<QString> listItemsToRefresh;
-    QString importOnShowPath;
-    MascotSessionStore sessions;
-    QString mascotsPath;
-    QString mascotCachePath;
-    bool cliRuntimeMode = false;
-    std::atomic<bool> shuttingDown{false};
+class ManagerTrayController : public QObject {
+public:
+    explicit ManagerTrayController(ShijimaManager *manager);
+    ~ManagerTrayController() override;
+
+    static bool isAvailable();
+    void refreshMenu();
+    void showMessage(QString const& title, QString const& message,
+        std::function<void()> onClick = {});
+
+private:
+    ShijimaManager *m_manager = nullptr;
+    QSystemTrayIcon *m_trayIcon = nullptr;
+    QMenu *m_trayMenu = nullptr;
+    std::function<void()> m_messageClickHandler;
 };

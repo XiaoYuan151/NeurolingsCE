@@ -85,6 +85,70 @@ bool ShijimaWidget::inspectorVisible() {
     return m_inspector != nullptr && m_inspector->isVisible();
 }
 
+bool ShijimaWidget::dragging() const {
+    return m_mascot->state->dragging;
+}
+
+void ShijimaWidget::setDragging(bool dragging) {
+    m_mascot->state->dragging = dragging;
+}
+
+ShijimaWidget::TickEnvironmentOverride
+ShijimaWidget::prepareTickEnvironmentOverride() {
+    TickEnvironmentOverride overrideState;
+    if (!m_fallThroughMode) {
+        return overrideState;
+    }
+
+    // Long falls intentionally bypass the taskbar floor and land at the real
+    // screen bottom; this preserves that behavior without leaking env details.
+    auto mascotEnv = env();
+    overrideState.active = true;
+    overrideState.floorY = mascotEnv->floor.y;
+    overrideState.workAreaBottom = mascotEnv->work_area.bottom;
+    mascotEnv->floor.y = mascotEnv->screen.bottom;
+    mascotEnv->work_area.bottom = mascotEnv->screen.bottom;
+    return overrideState;
+}
+
+void ShijimaWidget::restoreTickEnvironmentOverride(
+    TickEnvironmentOverride const& overrideState)
+{
+    if (!overrideState.active) {
+        return;
+    }
+    auto mascotEnv = env();
+    mascotEnv->floor.y = overrideState.floorY;
+    mascotEnv->work_area.bottom = overrideState.workAreaBottom;
+}
+
+void ShijimaWidget::resetFallThroughTrackingIfDragged() {
+    if (!dragging() || !m_fallThroughMode) {
+        return;
+    }
+    m_fallThroughMode = false;
+    m_fallTracking = false;
+}
+
+void ShijimaWidget::observeFallProgress(double anchorYBefore,
+    double anchorYAfter)
+{
+    bool onLand = m_mascot->state->on_land();
+    if (!onLand && !dragging() && anchorYAfter > anchorYBefore) {
+        if (!m_fallTracking) {
+            m_fallTracking = true;
+            m_fallStartY = anchorYBefore;
+        }
+        double fallDistance = anchorYAfter - m_fallStartY;
+        if (fallDistance >= 700.0) {
+            m_fallThroughMode = true;
+        }
+    }
+    else {
+        m_fallTracking = false;
+    }
+}
+
 void ShijimaWidget::tick() {
     try {
         if (m_markedForDeletion) {

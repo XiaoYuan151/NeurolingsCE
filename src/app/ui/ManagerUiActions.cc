@@ -17,8 +17,9 @@
 //
 
 #include "shijima-qt/ShijimaManager.hpp"
-#include "shijima-qt/AppLog.hpp"
 #include "shijima-qt/MascotData.hpp"
+#include "shijima-qt/ShijimaHttpApi.hpp"
+#include "shijima-qt/ShijimaLocalApi.hpp"
 #include "../runtime/ManagerRuntimeState.hpp"
 #include "ManagerUiState.hpp"
 #include "../runtime/ManagerRuntimeHelpers.hpp"
@@ -26,7 +27,6 @@
 #include <array>
 #include <cstdint>
 #include <cstdio>
-#include <filesystem>
 #include <QApplication>
 #include <QColor>
 #include <QCoreApplication>
@@ -35,6 +35,8 @@
 #include <QListWidget>
 #include <QMessageBox>
 #include <QProcess>
+#include <QSettings>
+#include <QStringList>
 #include <QTimer>
 #include <QTranslator>
 #include "ElaTheme.h"
@@ -131,13 +133,13 @@ void ShijimaManager::quitAction() {
 }
 
 void ShijimaManager::deleteAction() {
-    if (m_runtime->loadedMascots.size() == 0) {
+    if (m_runtime->templates.loadedMascots().size() == 0) {
         return;
     }
 
     auto selected = m_ui->listWidget->selectedItems();
     for (long i = (long)selected.size() - 1; i >= 0; --i) {
-        auto mascotData = m_runtime->loadedMascots[selected[i]->text()];
+        auto mascotData = m_runtime->templates.loadedMascots()[selected[i]->text()];
         if (!mascotData->deletable()) {
             selected.remove(i);
         }
@@ -162,25 +164,14 @@ void ShijimaManager::deleteAction() {
     msgBox.setIcon(QMessageBox::Icon::Question);
     int ret = msgBox.exec();
     if (ret == QMessageBox::StandardButton::Yes) {
+        QStringList names;
         for (auto item : selected) {
-            auto mascotData = m_runtime->loadedMascots[item->text()];
-            if (!mascotData->deletable()) {
-                continue;
-            }
-
-            std::filesystem::path path = mascotData->packagePath().toStdString();
-            APP_LOG_INFO("ui") << "Deleting mascot template name=\""
-                << item->text().toStdString() << "\" path=\"" << path.string() << "\"";
-            try {
-                std::filesystem::remove(path);
-            }
-            catch (std::exception &ex) {
-                APP_LOG_ERROR("ui") << "Failed to delete mascot template path=\""
-                    << path.string() << "\": " << ex.what();
-            }
-            reloadMascot(item->text());
+            names.append(item->text());
         }
-        refreshListWidget();
+        for (auto const& name : names) {
+            QString errorMessage;
+            removeMascotTemplate(name, errorMessage);
+        }
     }
 }
 
@@ -195,8 +186,8 @@ void ShijimaManager::updateStatusBar() {
     if (m_ui->statusLabel == nullptr) {
         return;
     }
-    int mascotCount = static_cast<int>(m_runtime->mascots.size());
-    int templateCount = m_runtime->loadedMascots.size();
+    int mascotCount = m_runtime->sessions.size();
+    int templateCount = m_runtime->templates.loadedMascots().size();
     m_ui->statusLabel->setText(tr("  Mascots: %1  |  Templates: %2")
         .arg(mascotCount).arg(templateCount));
 }
@@ -209,7 +200,7 @@ void ShijimaManager::updateSelectedMascotDetails() {
     MascotData *data = nullptr;
     auto selected = m_ui->listWidget->selectedItems();
     if (!selected.isEmpty()) {
-        data = m_runtime->loadedMascots.value(selected.first()->text(), nullptr);
+        data = m_runtime->templates.loadedMascots().value(selected.first()->text(), nullptr);
     }
 
     if (data == nullptr) {
@@ -276,7 +267,7 @@ void ShijimaManager::setManagerVisible(bool visible) {
     }
     else if (m_wasVisible && !visible) {
 #if defined(__APPLE__)
-        if (m_runtime->mascots.size() == 0) {
+        if (m_runtime->sessions.empty()) {
             askClose();
             return;
         }
@@ -307,7 +298,7 @@ void ShijimaManager::switchLanguage(const QString &langCode) {
     }
 
     m_ui->currentLanguage = langCode;
-    m_settings.setValue("language", langCode);
+    m_settings->setValue("language", langCode);
     if (langCode != "en") {
         m_ui->translator = new QTranslator(this);
         if (m_ui->translator->load("shijima-qt_" + langCode, ":/i18n")) {
@@ -324,8 +315,8 @@ void ShijimaManager::switchLanguage(const QString &langCode) {
             tr("Language Changed"),
             tr("The application will restart to apply the new language."));
 
-        m_localApi.stop();
-        m_httpApi.stop();
+        m_localApi->stop();
+        m_httpApi->stop();
 
         const QString program = QCoreApplication::applicationFilePath();
         const QStringList args = QCoreApplication::arguments().mid(1);
@@ -338,5 +329,5 @@ void ShijimaManager::switchLanguage(const QString &langCode) {
 void ShijimaManager::retranslateUi() {
     setWindowTitle(tr(APP_NAME " \u2014 Mascot Manager"));
     updateStatusBar();
-    ShijimaManagerUiInternal::refreshTrayMenu(this);
+    ShijimaManagerUiInternal::refreshTrayMenu(m_ui->trayController.get());
 }

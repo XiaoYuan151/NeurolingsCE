@@ -6,6 +6,8 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_SOURCE_D
 
 project(NeurolingsCE VERSION ${PROJECT_VERSION} LANGUAGES C CXX)
 
+enable_testing()
+
 if(MSVC)
   # This project expects a 64-bit Qt when using Qt's msvc2022_64 kit.
   # If you configure with Ninja from a Win32 (x86) environment, Qt6Config will be rejected.
@@ -182,9 +184,12 @@ target_sources(NeurolingsCE PRIVATE
   src/app/core/audio/SoundEffectManager.cc
   src/app/core/http/ShijimaHttpApi.cc
   src/app/runtime/ManagerEnvironmentSync.cc
+  src/app/runtime/ManagerEnvironmentController.cc
   src/app/runtime/ManagerImportWorkflow.cc
   src/app/runtime/ManagerLifecycle.cc
   src/app/runtime/ManagerMascotRuntime.cc
+  src/app/runtime/MascotSessionStore.cc
+  src/app/runtime/MascotTemplateStore.cc
   src/app/ui/mascot/MascotWidgetInteraction.cc
   src/app/ui/mascot/MascotWidgetLifecycle.cc
   src/app/ui/mascot/MascotWidgetRendering.cc
@@ -407,6 +412,36 @@ set_target_properties(NeurolingsCECli PROPERTIES OUTPUT_NAME "NeurolingsCE-cli")
 if(SHIJIMA_USE_QTMULTIMEDIA)
   target_link_libraries(NeurolingsCE PRIVATE Qt6::Multimedia)
 endif()
+
+add_executable(NeurolingsCETests
+  src/app/tests/AppCoreTests.cc
+  src/app/core/AppLog.cc
+  src/app/core/assets/MascotPackage.cc
+  src/app/core/commands/MascotApi.cc
+)
+target_include_directories(NeurolingsCETests PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/app
+  ${CMAKE_CURRENT_SOURCE_DIR}/libshimejifinder
+)
+target_compile_definitions(NeurolingsCETests PRIVATE
+  NEUROLINGSCE_VERSION="${PROJECT_VERSION}"
+  APP_NAME="NeurolingsCE"
+  APP_DISPLAY_NAME="NeurolingsCE[Shijima-Qt Edition]"
+)
+target_link_libraries(NeurolingsCETests PRIVATE
+  Qt6::Core
+  Qt6::Gui
+  shimejifinder
+)
+if(MSVC)
+  set_property(TARGET NeurolingsCETests PROPERTY MSVC_RUNTIME_LIBRARY "${_shijima_msvc_runtime}")
+endif()
+if(WIN32)
+  target_compile_definitions(NeurolingsCETests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+endif()
+add_test(NAME NeurolingsCETests COMMAND NeurolingsCETests)
 
 if(WIN32)
   target_compile_definitions(NeurolingsCE PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
