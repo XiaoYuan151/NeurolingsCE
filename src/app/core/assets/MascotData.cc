@@ -18,8 +18,11 @@
 
 #include "shijima-qt/MascotData.hpp"
 #include "shijima-qt/AssetLoader.hpp"
+#include "shijima-qt/MascotPackage.hpp"
 #include <QDirIterator>
+#include <QFile>
 #include <QPainter>
+#include <QTextStream>
 #include <QDir>
 #include "shijima-qt/DefaultMascot.hpp"
 #include <stdexcept>
@@ -35,14 +38,22 @@ static QString readFile(QString const& file) {
 
 MascotData::MascotData(): m_valid(false) {}
 
-MascotData::MascotData(QString const& path, int id): m_path(path),
+MascotData::MascotData(QString const& path, int id):
+    MascotData(path, path, id) {}
+
+MascotData::MascotData(QString const& packagePath, QString const& cachePath, int id):
+    m_path(cachePath), m_packagePath(packagePath),
     m_valid(true), m_id(id) 
 {
-    if (path == "@") {
-        m_name = "Default Mascot";
+    if (packagePath == "@") {
+        m_metadata = MascotPackage::metadataFromJson(
+            QByteArray(defaultMascot.at("info.json").first,
+                (qsizetype)defaultMascot.at("info.json").second));
+        m_name = m_metadata.name;
         m_behaviorsXML = QString { defaultMascot.at("behaviors.xml").first };
         m_actionsXML = QString { defaultMascot.at("actions.xml").first };
         m_path = "@";
+        m_packagePath = "@";
         m_imgRoot = "@/img";
         m_valid = true;
         m_deletable = false;
@@ -54,12 +65,14 @@ MascotData::MascotData(QString const& path, int id): m_path(path),
         return;
     }
     m_deletable = true;
-    QDir dir { path };
-    auto dirname = dir.dirName();
-    if (!dirname.endsWith(".mascot")) {
-        throw std::invalid_argument("Mascot folder name must end with .mascot");
+    QString errorMessage;
+    if (!MascotPackage::extractPackage(packagePath, cachePath, errorMessage)) {
+        throw std::runtime_error(errorMessage.toStdString());
     }
-    m_name = dirname.sliced(0, dirname.length() - 7);
+    QDir dir { cachePath };
+    m_metadata = MascotPackage::metadataFromJson(
+        readFile(dir.filePath("info.json")).toUtf8());
+    m_name = m_metadata.name;
     m_behaviorsXML = readFile(dir.filePath("behaviors.xml"));
     m_actionsXML = readFile(dir.filePath("actions.xml"));
     {
@@ -68,7 +81,7 @@ MascotData::MascotData(QString const& path, int id): m_path(path),
         parser.parse(m_actionsXML.toStdString(), m_behaviorsXML.toStdString());
     }
     dir.cd("img");
-    m_imgRoot = QDir::cleanPath(path + QDir::separator() + "img");
+    m_imgRoot = QDir::cleanPath(cachePath + QDir::separator() + "img");
     QDirIterator iter { dir.absolutePath(), QDir::Files,
         QDirIterator::NoIteratorFlags };
     QList<QString> images;
@@ -80,6 +93,9 @@ MascotData::MascotData(QString const& path, int id): m_path(path),
         }
     }
     images.sort(Qt::CaseInsensitive);
+    if (images.isEmpty()) {
+        throw std::runtime_error("mascot package does not contain preview images");
+    }
     QImage frame;
     frame.load(dir.absoluteFilePath(images[0]));
     QImage preview = renderPreview(frame);
@@ -124,8 +140,16 @@ QString const &MascotData::path() const {
     return m_path;
 }
 
+QString const &MascotData::packagePath() const {
+    return m_packagePath;
+}
+
 QString const &MascotData::name() const {
     return m_name;
+}
+
+MascotMetadata const &MascotData::metadata() const {
+    return m_metadata;
 }
 
 QIcon const &MascotData::preview() const {

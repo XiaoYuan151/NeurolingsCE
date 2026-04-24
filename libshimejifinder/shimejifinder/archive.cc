@@ -33,7 +33,7 @@ namespace shimejifinder {
 
 void archive::add_entry(archive_entry const& entry) {
     static const std::set<std::string> allowed_extensions =
-        { "wav", "png", "xml" };
+        { "wav", "png", "xml", "json", "txt" };
     if (allowed_extensions.count(entry.lower_extension()) == 1) {
         m_entries.push_back(std::make_shared<archive_entry>(entry));
     }

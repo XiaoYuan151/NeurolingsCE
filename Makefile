@@ -7,6 +7,7 @@ PREFIX ?= /usr/local
 SOURCES = src/app/main.cc \
 	src/app/core/assets/Asset.cc \
 	src/app/core/assets/MascotData.cc \
+	src/app/core/assets/MascotPackage.cc \
 	src/app/core/assets/AssetLoader.cc \
 	src/app/core/commands/MascotApi.cc \
 	src/app/core/commands/MascotCommandService.cc \
@@ -55,12 +56,13 @@ CLI_SOURCES = src/app/cli_main.cc \
 	src/app/cli/CommandExecutor.cc \
 	src/app/cli/OutputFormatter.cc \
 	src/app/core/AppLog.cc \
+	src/app/core/assets/MascotPackage.cc \
 	src/app/core/commands/MascotApi.cc \
 	src/app/core/localipc/ShijimaLocalApiClient.cc
 CLI_OBJECTS = $(patsubst %.cc,%.o,$(CLI_SOURCES))
 
 DEFAULT_MASCOT_FILES := $(addsuffix .png,$(addprefix src/assets/DefaultMascot/img/shime,$(shell seq -s ' ' 1 1 46))) \
-	src/assets/DefaultMascot/behaviors.xml src/assets/DefaultMascot/actions.xml
+	src/assets/DefaultMascot/info.json src/assets/DefaultMascot/behaviors.xml src/assets/DefaultMascot/actions.xml
 
 TS_FILES = translations/shijima-qt_zh_CN.ts
 QM_FILES = $(TS_FILES:.ts=.qm)

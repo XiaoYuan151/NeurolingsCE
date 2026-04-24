@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.21)
 
 include(cmake/Version.cmake)
 load_version(${CMAKE_SOURCE_DIR}/VERSION.txt)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/VERSION.txt")
 
 project(NeurolingsCE VERSION ${PROJECT_VERSION} LANGUAGES C CXX)
 
@@ -169,6 +170,7 @@ target_sources(NeurolingsCE PRIVATE
   src/app/core/AppLog.cc
   src/app/core/assets/Asset.cc
   src/app/core/assets/MascotData.cc
+  src/app/core/assets/MascotPackage.cc
   src/app/core/assets/AssetLoader.cc
   src/app/core/commands/MascotApi.cc
   src/app/core/commands/MascotCommandService.cc
@@ -226,12 +228,14 @@ target_sources(NeurolingsCECli PRIVATE
   src/app/cli/CommandExecutor.cc
   src/app/cli/OutputFormatter.cc
   src/app/core/AppLog.cc
+  src/app/core/assets/MascotPackage.cc
   src/app/core/commands/MascotApi.cc
   src/app/core/localipc/ShijimaLocalApiClient.cc
 )
 
 if(SHIJIMA_WITH_DEFAULT_MASCOT)
   set(_default_mascot_files
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/assets/DefaultMascot/info.json"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/assets/DefaultMascot/behaviors.xml"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/assets/DefaultMascot/actions.xml"
   )
