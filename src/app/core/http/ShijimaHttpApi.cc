@@ -73,41 +73,6 @@ std::optional<QJsonObject> jsonForRequest(Request const& req) {
     }
 }
 
-MascotPatch patchFromJson(QJsonObject object) {
-    MascotPatch patch;
-    auto anchorValue = object.take("anchor");
-    if (anchorValue.isObject()) {
-        auto anchorObject = anchorValue.toObject();
-        auto xValue = anchorObject.value("x");
-        auto yValue = anchorObject.value("y");
-        if (xValue.isDouble()) {
-            patch.anchorX = xValue.toDouble();
-        }
-        if (yValue.isDouble()) {
-            patch.anchorY = yValue.toDouble();
-        }
-    }
-    auto behaviorValue = object.take("behavior");
-    if (behaviorValue.isString()) {
-        patch.behavior = behaviorValue.toString();
-    }
-    return patch;
-}
-
-SpawnMascotRequest spawnRequestFromJson(QJsonObject object) {
-    SpawnMascotRequest request;
-    auto nameValue = object.take("name");
-    if (nameValue.isString()) {
-        request.name = nameValue.toString();
-    }
-    auto dataIdValue = object.take("data_id");
-    if (dataIdValue.isDouble()) {
-        request.dataId = dataIdValue.toInt();
-    }
-    request.patch = patchFromJson(object);
-    return request;
-}
-
 RegisterCliLabelRequest cliLabelRequestFromJson(QJsonObject object) {
     RegisterCliLabelRequest request;
     auto mascotIdValue = object.take("mascot_id");
@@ -150,6 +115,16 @@ void sendError(Response &res, MascotCommandStatus const& status) {
     sendJson(res, errorToJson(status));
 }
 
+bool parseSpawnRequest(QJsonObject const& object, SpawnMascotRequest &request) {
+    QString parseError;
+    return spawnMascotRequestFromJson(QJsonValue(object), request, &parseError);
+}
+
+bool parsePatch(QJsonObject const& object, MascotPatch &patch) {
+    QString parseError;
+    return mascotPatchFromJson(QJsonValue(object), patch, &parseError);
+}
+
 }
 
 ShijimaHttpApi::ShijimaHttpApi(ShijimaManager *manager): m_server(new Server),
@@ -183,7 +158,11 @@ ShijimaHttpApi::ShijimaHttpApi(ShijimaManager *manager): m_server(new Server),
             badRequest(req, res);
             return;
         }
-        auto request = spawnRequestFromJson(*json);
+        SpawnMascotRequest request;
+        if (!parseSpawnRequest(*json, request)) {
+            badRequest(req, res);
+            return;
+        }
         if (request.name.has_value() && request.dataId.has_value()) {
             badRequest(req, res);
             return;
@@ -207,8 +186,13 @@ ShijimaHttpApi::ShijimaHttpApi(ShijimaManager *manager): m_server(new Server),
             return;
         }
         auto id = std::stoi(req.matches[1].str());
+        MascotPatch patch;
+        if (!parsePatch(*json, patch)) {
+            badRequest(req, res);
+            return;
+        }
         MascotInfo mascot;
-        auto status = m_service.alterMascot(id, patchFromJson(*json), mascot);
+        auto status = m_service.alterMascot(id, patch, mascot);
         if (!status.ok()) {
             QJsonObject object = errorToJson(status);
             object["mascot"] = QJsonValue::Null;
