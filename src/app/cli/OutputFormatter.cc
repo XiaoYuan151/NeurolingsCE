@@ -357,6 +357,14 @@ int writeCliOutput(CliCommand const& command, CliExecutionResult const& result) 
         for (auto const& mascot : mascots) {
             std::cout << "[" << mascot.id << "] "
                 << mascot.name.toStdString() << std::endl;
+            if (!mascot.version.isEmpty()) {
+                std::cout << "  Version: "
+                    << mascot.version.toStdString() << std::endl;
+            }
+            if (!mascot.author.isEmpty()) {
+                std::cout << "  Author: "
+                    << mascot.author.toStdString() << std::endl;
+            }
         }
         return EXIT_SUCCESS;
     }
@@ -376,6 +384,14 @@ int writeCliOutput(CliCommand const& command, CliExecutionResult const& result) 
         for (auto const& mascot : result.loadedMascots) {
             std::cout << "[" << mascot.id << "] "
                 << mascot.name.toStdString() << std::endl;
+            if (!mascot.version.isEmpty()) {
+                std::cout << "  Version: "
+                    << mascot.version.toStdString() << std::endl;
+            }
+            if (!mascot.author.isEmpty()) {
+                std::cout << "  Author: "
+                    << mascot.author.toStdString() << std::endl;
+            }
         }
         return EXIT_SUCCESS;
     }

@@ -34,7 +34,10 @@ Returns a list of mascots that are on the screen.
             "data_id": 0,
             "id": 35,
             "label": 0,
-            "name": "Default Mascot"
+            "name": "Default",
+            "version": "1.0",
+            "description": "Default mascot for the application.",
+            "author": "pixelomer[https://github.com/pixelomer]"
         },
         {
             "active_behavior": "Fall",

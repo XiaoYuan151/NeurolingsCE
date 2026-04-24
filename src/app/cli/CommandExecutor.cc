@@ -19,6 +19,7 @@
 #include "InternalCli.hpp"
 
 #include "shijima-qt/AppLog.hpp"
+#include "shijima-qt/MascotPackage.hpp"
 #include "shijima-qt/ShijimaLocalApi.hpp"
 
 #include <QCoreApplication>
@@ -37,8 +38,6 @@
 #include <algorithm>
 #include <exception>
 #include <map>
-
-#include <shimejifinder/analyze.hpp>
 
 namespace {
 
@@ -333,28 +332,39 @@ bool listStandaloneLoadedMascots(QList<LoadedMascotInfo> &mascots,
     if (!ensureMascotStorage(storagePath, error)) {
         return false;
     }
+    MascotPackage::migrateLegacyDirectories(storagePath);
 
     mascots.clear();
-    mascots.append(LoadedMascotInfo { 0, QStringLiteral("Default Mascot") });
+    auto defaultMetadata = MascotPackage::defaultMetadata();
+    mascots.append(LoadedMascotInfo { 0, defaultMetadata.name,
+        defaultMetadata.version, defaultMetadata.description,
+        defaultMetadata.author });
 
-    QStringList names;
-    QDirIterator iter { storagePath, QDir::Dirs | QDir::NoDotAndDotDot,
+    QList<LoadedMascotInfo> packageMascots;
+    QDirIterator iter { storagePath, QStringList { QStringLiteral("*.mascot") },
+        QDir::Files,
         QDirIterator::NoIteratorFlags };
     while (iter.hasNext()) {
         QFileInfo entry = iter.nextFileInfo();
-        QString dirname = entry.fileName();
-        if (!dirname.endsWith(QStringLiteral(".mascot"), Qt::CaseInsensitive) ||
-            dirname.length() <= 7)
+        MascotMetadata metadata;
+        QString errorMessage;
+        if (!MascotPackage::inspectPackage(entry.absoluteFilePath(), metadata,
+            errorMessage))
         {
             continue;
         }
-        names.append(dirname.sliced(0, dirname.length() - 7));
+        packageMascots.append(LoadedMascotInfo { -1, metadata.name,
+            metadata.version, metadata.description, metadata.author });
     }
-    names.sort(Qt::CaseInsensitive);
+    std::sort(packageMascots.begin(), packageMascots.end(),
+        [](LoadedMascotInfo const& lhs, LoadedMascotInfo const& rhs) {
+            return QString::compare(lhs.name, rhs.name, Qt::CaseInsensitive) < 0;
+        });
 
     int id = 1;
-    for (auto const& name : names) {
-        mascots.append(LoadedMascotInfo { id++, name });
+    for (auto mascot : packageMascots) {
+        mascot.id = id++;
+        mascots.append(mascot);
     }
     return true;
 }
@@ -373,25 +383,10 @@ bool importStandaloneMascotTemplate(QString const& archivePath,
     if (!ensureMascotStorage(storagePath, error)) {
         return false;
     }
+    MascotPackage::migrateLegacyDirectories(storagePath);
 
-    std::set<std::string> changed;
-    try {
-        auto archive = shimejifinder::analyze(archiveInfo.absoluteFilePath().toStdString());
-        if (!archive) {
-            error = makeError(QStringLiteral("import_failed"),
-                QStringLiteral("Could not analyze mascot archive"), 1, 0,
-                archiveInfo.absoluteFilePath());
-            return false;
-        }
-        archive->extract(storagePath.toStdString());
-        changed = archive->shimejis();
-    }
-    catch (std::exception const& ex) {
-        error = makeError(QStringLiteral("import_failed"),
-            QStringLiteral("Could not import mascot archive"), 1, 0,
-            QString::fromUtf8(ex.what()));
-        return false;
-    }
+    std::set<std::string> changed = MascotPackage::importArchive(
+        archiveInfo.absoluteFilePath(), storagePath);
 
     if (changed.empty()) {
         error = makeError(QStringLiteral("import_failed"),
@@ -433,7 +428,9 @@ bool removeStandaloneMascotTemplate(QString const& requestedName,
             2);
         return false;
     }
-    if (name == QStringLiteral("Default Mascot")) {
+    if (name == QStringLiteral("Default") ||
+        name == QStringLiteral("Default Mascot"))
+    {
         error = makeError(QStringLiteral("mascot_template_not_deletable"),
             QStringLiteral("Mascot template cannot be deleted"));
         return false;
@@ -443,13 +440,11 @@ bool removeStandaloneMascotTemplate(QString const& requestedName,
     if (!ensureMascotStorage(storagePath, error)) {
         return false;
     }
+    MascotPackage::migrateLegacyDirectories(storagePath);
 
-    QDir storageDir { storagePath };
     QFileInfo storageInfo { storagePath };
-    QFileInfo targetInfo {
-        storageDir.absoluteFilePath(name + QStringLiteral(".mascot"))
-    };
-    if (!targetInfo.exists() || !targetInfo.isDir()) {
+    QFileInfo targetInfo { MascotPackage::packagePathForName(storagePath, name) };
+    if (!targetInfo.exists() || !targetInfo.isFile()) {
         error = makeError(QStringLiteral("mascot_template_not_found"),
             QStringLiteral("No such mascot template"));
         return false;
@@ -466,8 +461,7 @@ bool removeStandaloneMascotTemplate(QString const& requestedName,
         return false;
     }
 
-    QDir targetDir { targetCanonical };
-    if (!targetDir.removeRecursively()) {
+    if (!QFile::remove(targetCanonical)) {
         error = makeError(QStringLiteral("remove_failed"),
             QStringLiteral("Could not remove mascot template"), 1, 0,
             targetCanonical);

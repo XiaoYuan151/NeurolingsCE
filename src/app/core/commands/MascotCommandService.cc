@@ -52,6 +52,9 @@ LoadedMascotInfo buildLoadedMascotInfo(MascotData *data) {
     LoadedMascotInfo info;
     info.id = data->id();
     info.name = data->name();
+    info.version = data->metadata().version;
+    info.description = data->metadata().description;
+    info.author = data->metadata().author;
     return info;
 }
 

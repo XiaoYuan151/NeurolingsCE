@@ -7,43 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.3.1] - 2026-04-24
+## [0.3.2] - 2026-04-24
 
 ### 🚀 Major Changes / 重大变更
 
-#### Update Experience Upgrade / 更新体验升级
-- **GitHub Update Check** - Added built-in update checking against GitHub releases
-  - GitHub 更新检查 - 新增基于 GitHub Release 的内置更新检查能力
-- **About Page Update Center** - Added an update center entry in the about page for version and release information
-  - 关于页更新中心 - 在关于页面中新增更新中心入口，用于展示版本与发布信息
-- **Settings Page Rework** - Refactored the settings page layout for a clearer and more maintainable structure
-  - 设置页重构 - 重构设置页面布局，使功能分区更清晰、结构更易维护
+#### Mascot Package Format Upgrade / 桌宠包格式升级
+- **Self-contained `.mascot` Packages** - Mascot templates are now stored as single package files instead of extracted folders
+  - 自包含 `.mascot` 包 - 桌宠模板现在以单个包文件保存，不再直接作为解压后的文件夹存放
+- **Mascot Metadata Support** - Added `info.json` metadata with name, version, description, and author fields
+  - 桌宠元数据支持 - 新增 `info.json` 元数据，支持名称、版本、描述和作者信息
+- **Legacy Directory Migration** - Existing legacy `.mascot` directories are migrated into the new package format automatically
+  - 旧目录自动迁移 - 已存在的旧版 `.mascot` 文件夹会自动迁移为新的包格式
 
-#### Localization & Release Metadata / 本地化与发布元数据
-- **Chinese Translation Completion** - Added Chinese translations for the new update-related UI
-  - 中文翻译补全 - 为新增更新功能相关界面补充中文翻译
-- **Version Metadata Sync** - Synchronized the 0.3.1 version metadata for release packaging and display
-  - 版本元数据同步 - 同步 0.3.1 版本元数据，用于发布打包与版本展示
+#### Library & Control Surface Improvements / 桌宠库与控制接口增强
+- **Mascot Details Panel** - Added a home-page details panel showing preview, version, author, and description for the selected mascot
+  - 桌宠详情面板 - 在主页新增详情面板，展示所选桌宠的预览图、版本、作者和描述
+- **CLI/API Metadata Output** - CLI and JSON API loaded mascot results now include mascot metadata
+  - CLI/API 元数据输出 - CLI 与 JSON API 的已加载桌宠结果现在会包含桌宠元数据
+- **Default Mascot Metadata** - Bundled default mascot now includes `info.json` and participates in the same metadata flow
+  - 默认桌宠元数据 - 内置默认桌宠现在包含 `info.json`，并接入统一元数据流程
 
 ### ✨ Added / 新增功能
 
-- **GitHub release update check** - The application can now check whether a newer version is available on GitHub / 新增 GitHub Release 更新检查能力，应用现在可以检查是否存在新版本
-- **In-app update center** - Added update information entry in the about page / 新增应用内更新中心入口，可在关于页查看更新信息
-- **Reorganized settings UI** - Improved settings page grouping and readability / 新增更清晰的设置页组织方式，提升可读性与易用性
-- **Update feature localization** - Added Chinese text coverage for update-related actions and prompts / 新增更新功能相关操作与提示的中文文本覆盖
+- **MascotPackage helper** - Added a shared package helper for reading metadata, installing packages, extracting packages, and migrating legacy folders / 新增 `MascotPackage` 工具，用于读取元数据、安装包、解包和迁移旧目录
+- **Package cache directory** - Added a dedicated mascot cache directory for runtime extraction / 新增桌宠缓存目录，用于运行时解包
+- **Package metadata fields** - Added version, description, and author fields to loaded mascot information / 为已加载桌宠信息新增版本、描述和作者字段
+- **Home-page details UI** - Added selected mascot details and richer list tooltips / 新增主页所选桌宠详情展示与更丰富的列表提示
+- **Direct `.mascot` import** - Import workflow can now install `.mascot` package files directly / 导入流程现在可以直接安装 `.mascot` 包文件
 
 ### 🐛 Fixed / Bug 修复
 
-- Fixed missing or incomplete Chinese text in the new update-related UI / 修复新增更新相关界面中缺失或不完整的中文文本
-- Fixed settings page organization issues that made some options harder to find / 修复设置页结构较杂乱、部分选项不易定位的问题
-- Fixed version metadata inconsistency affecting release-facing version display / 修复版本元数据不同步导致的发布侧版本展示不一致问题
+- Fixed mascot removal so deleting a template removes the package file instead of trying to delete extracted runtime contents / 修复桌宠删除逻辑，现在会删除包文件，而不是尝试删除运行时解包内容
+- Fixed legacy import metadata gaps by generating fallback `info.json` for old mascot folders / 修复旧版导入缺少元数据的问题，会为旧目录生成回退 `info.json`
+- Fixed package inspection to reject incomplete mascot packages that miss required XML files or preview images / 修复包检查逻辑，会拒绝缺少必要 XML 文件或预览图片的不完整桌宠包
+- Fixed archive filtering so `json` and `txt` files required by mascot metadata and bubble context can be preserved / 修复压缩包过滤逻辑，保留桌宠元数据和气泡上下文所需的 `json` 与 `txt` 文件
 
 ### 🔧 Changed / 改进与优化
 
-- **Update Workflow** - Improved how users discover new versions from within the application / 更新流程优化 - 改善用户在应用内发现新版本的方式
-- **UI Structure** - Refined the settings page information hierarchy and page layout / 界面结构优化 - 调整设置页信息层级与页面布局
-- **Localization** - Expanded translation coverage around the update feature / 本地化优化 - 完善更新功能周边的翻译覆盖
-- **Release Preparation** - Refreshed 0.3.1 metadata for packaging and release notes alignment / 发布准备优化 - 刷新 0.3.1 元数据，使打包结果与发布说明保持一致
+- **Storage Model** - Mascot storage now tracks package paths separately from extracted cache paths / 存储模型优化 - 桌宠存储现在区分包路径和解包缓存路径
+- **Import Workflow** - Legacy Shimeji archives are packaged during import for consistent storage behavior / 导入流程优化 - 旧版 Shimeji 压缩包会在导入时重新打包，保持统一存储行为
+- **CLI Output** - Human-readable CLI list output now shows version and author when available / CLI 输出优化 - 可读 CLI 列表输出现在会在可用时展示版本和作者
+- **Build Integration** - Added package support source files and default `info.json` to both CMake and Make build paths / 构建集成优化 - 在 CMake 与 Make 构建路径中加入包格式支持源码和默认 `info.json`
+- **Release Metadata** - Refreshed 0.3.2 version metadata for packaging and platform manifests / 发布元数据整理 - 更新 0.3.2 版本元数据、打包信息与平台清单
 
 ---
 
@@ -163,7 +168,7 @@ As a community version of the Neuro mascot, NeurolingsCE is a complete port of t
 
 ## Contributors / 贡献者
 
-### [0.3.1]
+### [0.3.2]
 - [@qingchenyouforcc](https://github.com/qingchenyouforcc) - Main development, update center, settings page rework, localization updates / 主要开发，完成更新中心、设置页重构与本地化更新
 - [@wyf7685](https://github.com/wyf7685) - CI fixes and code optimization / CI 修复与代码优化
 
@@ -180,6 +185,7 @@ As a community version of the Neuro mascot, NeurolingsCE is a complete port of t
 
 ---
 
+[0.3.2]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.3.1...0.3.2
 [0.3.1]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.3.0...0.3.1
 [0.3.0]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.2.0...0.3.0
 [0.2.0]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.1.x...0.2.0

@@ -103,6 +103,9 @@ QJsonObject loadedMascotInfoToJson(LoadedMascotInfo const& mascot) {
     QJsonObject object;
     object["id"] = mascot.id;
     object["name"] = mascot.name;
+    object["version"] = mascot.version;
+    object["description"] = mascot.description;
+    object["author"] = mascot.author;
     return object;
 }
 
@@ -295,5 +298,8 @@ bool loadedMascotInfoFromJson(QJsonValue const& value,
     }
     mascot.id = idValue.toInt();
     mascot.name = nameValue.toString();
+    mascot.version = object.value("version").toString();
+    mascot.description = object.value("description").toString();
+    mascot.author = object.value("author").toString();
     return true;
 }

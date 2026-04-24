@@ -38,6 +38,9 @@ struct MascotInfo {
 struct LoadedMascotInfo {
     int id = -1;
     QString name;
+    QString version;
+    QString description;
+    QString author;
 };
 
 struct MascotPatch {
