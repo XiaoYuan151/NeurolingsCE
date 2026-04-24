@@ -112,6 +112,7 @@ private:
     void loadAllMascots();
     void syncMascotLibrary();
     void refreshListWidget();
+    void updateSelectedMascotDetails();
     void setupNavigation();
     void setupHomePage();
     void setupSettingsPage();

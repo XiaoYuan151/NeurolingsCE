@@ -168,14 +168,10 @@ void ShijimaManager::deleteAction() {
                 continue;
             }
 
-            std::filesystem::path path = mascotData->path().toStdString();
+            std::filesystem::path path = mascotData->packagePath().toStdString();
             APP_LOG_INFO("ui") << "Deleting mascot template name=\""
                 << item->text().toStdString() << "\" path=\"" << path.string() << "\"";
             try {
-                std::filesystem::remove_all(path / "img");
-                std::filesystem::remove_all(path / "sound");
-                std::filesystem::remove(path / "actions.xml");
-                std::filesystem::remove(path / "behaviors.xml");
                 std::filesystem::remove(path);
             }
             catch (std::exception &ex) {
@@ -203,6 +199,43 @@ void ShijimaManager::updateStatusBar() {
     int templateCount = m_runtime->loadedMascots.size();
     m_ui->statusLabel->setText(tr("  Mascots: %1  |  Templates: %2")
         .arg(mascotCount).arg(templateCount));
+}
+
+void ShijimaManager::updateSelectedMascotDetails() {
+    if (m_ui->mascotNameLabel == nullptr) {
+        return;
+    }
+
+    MascotData *data = nullptr;
+    auto selected = m_ui->listWidget->selectedItems();
+    if (!selected.isEmpty()) {
+        data = m_runtime->loadedMascots.value(selected.first()->text(), nullptr);
+    }
+
+    if (data == nullptr) {
+        if (m_ui->mascotPreviewLabel != nullptr) {
+            m_ui->mascotPreviewLabel->clear();
+            m_ui->mascotPreviewLabel->setText(QStringLiteral("-"));
+        }
+        m_ui->mascotNameLabel->setText(tr("No mascot selected"));
+        m_ui->mascotVersionLabel->clear();
+        m_ui->mascotAuthorLabel->clear();
+        m_ui->mascotDescriptionLabel->clear();
+        return;
+    }
+
+    auto const& metadata = data->metadata();
+    if (m_ui->mascotPreviewLabel != nullptr) {
+        auto pixmap = data->preview().pixmap(80, 80);
+        m_ui->mascotPreviewLabel->setText(QString());
+        m_ui->mascotPreviewLabel->setPixmap(pixmap);
+    }
+    m_ui->mascotNameLabel->setText(metadata.name);
+    m_ui->mascotVersionLabel->setText(metadata.version.isEmpty()
+        ? QString() : tr("Version: %1").arg(metadata.version));
+    m_ui->mascotAuthorLabel->setText(metadata.author.isEmpty()
+        ? QString() : tr("Author: %1").arg(metadata.author));
+    m_ui->mascotDescriptionLabel->setText(metadata.description);
 }
 
 void ShijimaManager::itemDoubleClicked(QListWidgetItem *qItem) {

@@ -19,6 +19,7 @@
 #include "shijima-qt/ShijimaManager.hpp"
 #include "shijima-qt/AppLog.hpp"
 #include "shijima-qt/MascotData.hpp"
+#include "shijima-qt/MascotPackage.hpp"
 #include "shijima-qt/ui/mascot/ShijimaWidget.hpp"
 #include "ManagerRuntimeState.hpp"
 #include "../ui/ManagerUiState.hpp"
@@ -28,6 +29,8 @@
 #include <stdexcept>
 #include <QDir>
 #include <QDirIterator>
+#include <QFile>
+#include <QFileInfo>
 #include <QGuiApplication>
 #include <QListWidget>
 #include <QRandomGenerator>
@@ -194,7 +197,8 @@ void ShijimaManager::reloadMascot(QString const& name) {
     MascotData *newData = nullptr;
     try {
         newData = new MascotData {
-            m_runtime->mascotsPath + QDir::separator() + name + ".mascot",
+            MascotPackage::packagePathForName(m_runtime->mascotsPath, name),
+            MascotPackage::cachePathForName(m_runtime->mascotCachePath, name),
             m_runtime->idCounter++
         };
     }
@@ -238,39 +242,74 @@ void ShijimaManager::refreshListWidget() {
     for (auto &name : names) {
         auto item = new QListWidgetItem;
         item->setText(name);
-        item->setIcon(m_runtime->loadedMascots[name]->preview());
+        auto *data = m_runtime->loadedMascots[name];
+        item->setIcon(data->preview());
+        item->setSizeHint(QSize(0, 72));
+        QStringList tooltip;
+        tooltip.append(data->name());
+        if (!data->metadata().version.isEmpty()) {
+            tooltip.append(tr("Version: %1").arg(data->metadata().version));
+        }
+        if (!data->metadata().author.isEmpty()) {
+            tooltip.append(tr("Author: %1").arg(data->metadata().author));
+        }
+        item->setToolTip(tooltip.join(QLatin1Char('\n')));
         if (selectedNames.contains(name)) {
             item->setSelected(true);
         }
         m_ui->listWidget->addItem(item);
     }
     m_runtime->listItemsToRefresh.clear();
+    updateSelectedMascotDetails();
     updateStatusBar();
 }
 
 void ShijimaManager::loadAllMascots() {
-    QDirIterator iter { m_runtime->mascotsPath, QDir::Dirs | QDir::NoDotAndDotDot,
+    QDirIterator iter { m_runtime->mascotsPath, QStringList { QStringLiteral("*.mascot") },
+        QDir::Files,
         QDirIterator::NoIteratorFlags };
     while (iter.hasNext()) {
-        auto name = iter.nextFileInfo().fileName();
-        if (!name.endsWith(".mascot") || name.length() <= 7) {
+        auto packagePath = iter.nextFileInfo().absoluteFilePath();
+        MascotMetadata metadata;
+        QString errorMessage;
+        if (!MascotPackage::inspectPackage(packagePath, metadata, errorMessage)) {
+            APP_LOG_WARN("mascot") << "Skipping invalid mascot package path=\""
+                << packagePath.toStdString() << "\": "
+                << errorMessage.toStdString();
             continue;
         }
-        reloadMascot(name.sliced(0, name.length() - 7));
+        QString canonicalPath = QFileInfo(packagePath).absoluteFilePath();
+        QString expectedPath = QFileInfo(MascotPackage::packagePathForName(
+            m_runtime->mascotsPath, metadata.name)).absoluteFilePath();
+        if (canonicalPath != expectedPath) {
+            QFile::remove(expectedPath);
+            QFile::rename(canonicalPath, expectedPath);
+        }
+        reloadMascot(metadata.name);
     }
     refreshListWidget();
 }
 
 void ShijimaManager::syncMascotLibrary() {
     QSet<QString> mascotsOnDisk;
-    QDirIterator iter { m_runtime->mascotsPath, QDir::Dirs | QDir::NoDotAndDotDot,
+    QDirIterator iter { m_runtime->mascotsPath, QStringList { QStringLiteral("*.mascot") },
+        QDir::Files,
         QDirIterator::NoIteratorFlags };
     while (iter.hasNext()) {
-        auto name = iter.nextFileInfo().fileName();
-        if (!name.endsWith(".mascot") || name.length() <= 7) {
+        auto packagePath = iter.nextFileInfo().absoluteFilePath();
+        MascotMetadata metadata;
+        QString errorMessage;
+        if (!MascotPackage::inspectPackage(packagePath, metadata, errorMessage)) {
             continue;
         }
-        mascotsOnDisk.insert(name.sliced(0, name.length() - 7));
+        QString canonicalPath = QFileInfo(packagePath).absoluteFilePath();
+        QString expectedPath = QFileInfo(MascotPackage::packagePathForName(
+            m_runtime->mascotsPath, metadata.name)).absoluteFilePath();
+        if (canonicalPath != expectedPath) {
+            QFile::remove(expectedPath);
+            QFile::rename(canonicalPath, expectedPath);
+        }
+        mascotsOnDisk.insert(metadata.name);
     }
 
     auto loadedNames = m_runtime->loadedMascots.keys();
@@ -316,14 +355,10 @@ bool ShijimaManager::removeMascotTemplate(QString const& name,
         return false;
     }
 
-    std::filesystem::path path = mascotData->path().toStdString();
+    std::filesystem::path path = mascotData->packagePath().toStdString();
     APP_LOG_INFO("mascot") << "Deleting mascot template name=\""
         << name.toStdString() << "\" path=\"" << path.string() << "\"";
     try {
-        std::filesystem::remove_all(path / "img");
-        std::filesystem::remove_all(path / "sound");
-        std::filesystem::remove(path / "actions.xml");
-        std::filesystem::remove(path / "behaviors.xml");
         std::filesystem::remove(path);
     }
     catch (std::exception &ex) {

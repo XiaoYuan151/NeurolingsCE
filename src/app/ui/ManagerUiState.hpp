@@ -36,6 +36,12 @@ struct ShijimaManagerUiState {
     QTranslator *qtTranslator = nullptr;
     QString currentLanguage = "en";
     QLabel *statusLabel = nullptr;
+    QWidget *mascotDetailsPanel = nullptr;
+    QLabel *mascotPreviewLabel = nullptr;
+    QLabel *mascotNameLabel = nullptr;
+    QLabel *mascotVersionLabel = nullptr;
+    QLabel *mascotAuthorLabel = nullptr;
+    QLabel *mascotDescriptionLabel = nullptr;
     QWidget *homePage = nullptr;
     QWidget *settingsPage = nullptr;
     QString settingsKey;

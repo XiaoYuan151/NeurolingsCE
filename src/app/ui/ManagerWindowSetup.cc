@@ -18,6 +18,7 @@
 
 #include "shijima-qt/ShijimaManager.hpp"
 #include "shijima-qt/AppLog.hpp"
+#include "shijima-qt/MascotPackage.hpp"
 #include "../core/update/GitHubUpdateManager.hpp"
 
 #include "../runtime/ManagerRuntimeState.hpp"
@@ -68,9 +69,14 @@ ShijimaManager::ShijimaManager(QWidget *parent):
 
     QString dataPath = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
     QString mascotsPath = QDir::cleanPath(dataPath + QDir::separator() + "mascots");
+    QString mascotCachePath = QDir::cleanPath(dataPath + QDir::separator() + "mascot-cache");
     QDir mascotsDir(mascotsPath);
     if (!mascotsDir.exists()) {
         mascotsDir.mkpath(mascotsPath);
+    }
+    QDir cacheDir(mascotCachePath);
+    if (!cacheDir.exists()) {
+        cacheDir.mkpath(mascotCachePath);
     }
     if (QFile readme { mascotsDir.absoluteFilePath("README.txt") };
         readme.open(QFile::WriteOnly | QFile::NewOnly | QFile::Text))
@@ -83,6 +89,8 @@ ShijimaManager::ShijimaManager(QWidget *parent):
         readme.close();
     }
     m_runtime->mascotsPath = mascotsPath;
+    m_runtime->mascotCachePath = mascotCachePath;
+    MascotPackage::migrateLegacyDirectories(m_runtime->mascotsPath);
     APP_LOG_INFO("startup") << "Mascot storage path=\""
         << m_runtime->mascotsPath.toStdString() << "\"";
     m_updateManager = new GitHubUpdateManager(&m_settings, this);
@@ -125,6 +133,8 @@ ShijimaManager::ShijimaManager(QWidget *parent):
 
     connect(m_ui->listWidget, &QListWidget::itemDoubleClicked,
         this, &ShijimaManager::itemDoubleClicked);
+    connect(m_ui->listWidget, &QListWidget::itemSelectionChanged,
+        this, &ShijimaManager::updateSelectedMascotDetails);
     m_ui->listWidget->setIconSize({ 64, 64 });
     m_ui->listWidget->installEventFilter(this);
     m_ui->listWidget->setSelectionMode(QListWidget::ExtendedSelection);

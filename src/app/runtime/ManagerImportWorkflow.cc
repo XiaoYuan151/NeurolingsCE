@@ -18,6 +18,7 @@
 
 #include "shijima-qt/ShijimaManager.hpp"
 #include "shijima-qt/AppLog.hpp"
+#include "shijima-qt/MascotPackage.hpp"
 #include "ManagerRuntimeState.hpp"
 #include "../ui/ManagerUiHelpers.hpp"
 #include "ManagerRuntimeHelpers.hpp"
@@ -30,15 +31,12 @@
 #include <QUrl>
 #include <QtConcurrent>
 #include "shijima-qt/ui/dialogs/common/ForcedProgressDialog.hpp"
-#include <shimejifinder/analyze.hpp>
 
 
 std::set<std::string> ShijimaManager::import(QString const& path) noexcept {
     try {
         APP_LOG_INFO("import") << "Importing mascot archive path=\"" << path.toStdString() << "\"";
-        auto ar = shimejifinder::analyze(path.toStdString());
-        ar->extract(m_runtime->mascotsPath.toStdString());
-        auto shimejis = ar->shimejis();
+        auto shimejis = MascotPackage::importArchive(path, m_runtime->mascotsPath);
         APP_LOG_INFO("import") << "Imported archive path=\"" << path.toStdString()
             << "\" templates=" << shimejis.size();
         return shimejis;
