@@ -34,8 +34,11 @@ class ManagerEnvironmentController {
 public:
     Platform::ActiveWindowObserver& windowObserver();
 
+    double userScale() const;
+    double detachThreshold() const;
     void setUserScale(double scale);
     void setDetachThreshold(double threshold);
+    void setAllowsBreeding(bool allowsBreeding);
 
     void screenAdded(QScreen *screen);
     void screenRemoved(QScreen *screen, QScreen *primaryScreen,

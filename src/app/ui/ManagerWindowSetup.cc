@@ -162,6 +162,8 @@ ShijimaManager::ShijimaManager(QWidget *parent):
 
     m_runtime->environment.setDetachThreshold(m_settings->value("detachThreshold",
         QVariant::fromValue(30.0)).toDouble());
+    m_runtime->environment.setUserScale(m_settings->value("userScale",
+        QVariant::fromValue(1.0)).toDouble());
 
     if (!m_runtime->cliRuntimeMode) {
         setupNavigation();

@@ -34,12 +34,26 @@ Platform::ActiveWindowObserver& ManagerEnvironmentController::windowObserver() {
     return m_windowObserver;
 }
 
+double ManagerEnvironmentController::userScale() const {
+    return m_userScale;
+}
+
+double ManagerEnvironmentController::detachThreshold() const {
+    return m_detachThreshold;
+}
+
 void ManagerEnvironmentController::setUserScale(double scale) {
     m_userScale = scale;
 }
 
 void ManagerEnvironmentController::setDetachThreshold(double threshold) {
     m_detachThreshold = threshold;
+}
+
+void ManagerEnvironmentController::setAllowsBreeding(bool allowsBreeding) {
+    for (auto &env : m_env) {
+        env->allows_breeding = allowsBreeding;
+    }
 }
 
 void ManagerEnvironmentController::screenAdded(QScreen *screen) {

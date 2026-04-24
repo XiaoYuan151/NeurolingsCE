@@ -17,6 +17,8 @@
 //
 
 #include "shijima-qt/ShijimaManager.hpp"
+#include "shijima-qt/ShijimaHttpApi.hpp"
+#include "shijima-qt/ShijimaLocalApi.hpp"
 #include "../ManagerUiState.hpp"
 #include "../ManagerUiHelpers.hpp"
 #include "../../core/update/GitHubUpdateManager.hpp"
@@ -380,8 +382,8 @@ void ShijimaManager::showAboutDialog()
                 return;
             }
 
-            m_localApi.stop();
-            m_httpApi.stop();
+            m_localApi->stop();
+            m_httpApi->stop();
             m_allowClose = true;
             aboutDialog->accept();
             closeWindow();

@@ -35,6 +35,7 @@
 #include <QLineEdit>
 #include <QRadioButton>
 #include <QScrollArea>
+#include <QSettings>
 #include <QSlider>
 #include <QSpinBox>
 #include <QVariant>
@@ -249,18 +250,14 @@ void ShijimaManager::setupSettingsPage() {
 
     {
         static const QString key = "multiplicationEnabled";
-        bool initial = m_settings.value(key, QVariant::fromValue(true)).toBool();
-        for (auto &env : m_runtime->env) {
-            env->allows_breeding = initial;
-        }
+        bool initial = m_settings->value(key, QVariant::fromValue(true)).toBool();
+        m_runtime->environment.setAllowsBreeding(initial);
 
         auto *toggle = new ElaToggleSwitch(settingsContent);
         toggle->setIsToggled(initial);
         connect(toggle, &ElaToggleSwitch::toggled, [this](bool checked) {
-            for (auto &env : m_runtime->env) {
-                env->allows_breeding = checked;
-            }
-            m_settings.setValue("multiplicationEnabled", QVariant::fromValue(checked));
+            m_runtime->environment.setAllowsBreeding(checked);
+            m_settings->setValue("multiplicationEnabled", QVariant::fromValue(checked));
         });
 
         settingsLayout->addWidget(createSettingsRow(settingsContent,
@@ -271,12 +268,12 @@ void ShijimaManager::setupSettingsPage() {
 
     {
         static const QString key = "speechBubbleEnabled";
-        bool initial = m_settings.value(key, QVariant::fromValue(true)).toBool();
+        bool initial = m_settings->value(key, QVariant::fromValue(true)).toBool();
 
         auto *toggle = new ElaToggleSwitch(settingsContent);
         toggle->setIsToggled(initial);
         connect(toggle, &ElaToggleSwitch::toggled, [this](bool checked) {
-            m_settings.setValue("speechBubbleEnabled", QVariant::fromValue(checked));
+            m_settings->setValue("speechBubbleEnabled", QVariant::fromValue(checked));
         });
 
         settingsLayout->addWidget(createSettingsRow(settingsContent,
@@ -287,14 +284,14 @@ void ShijimaManager::setupSettingsPage() {
 
     {
         static const QString key = "speechBubbleClickCount";
-        int initial = m_settings.value(key, 1).toInt();
+        int initial = m_settings->value(key, 1).toInt();
 
         auto *spinBox = new QSpinBox(settingsContent);
         spinBox->setRange(1, 10);
         spinBox->setValue(initial);
         spinBox->setMinimumWidth(88);
         connect(spinBox, QOverload<int>::of(&QSpinBox::valueChanged), [this](int val) {
-            m_settings.setValue("speechBubbleClickCount", val);
+            m_settings->setValue("speechBubbleClickCount", val);
         });
 
         settingsLayout->addWidget(createSettingsRow(settingsContent,
@@ -308,11 +305,12 @@ void ShijimaManager::setupSettingsPage() {
         auto *btn = new ElaPushButton(tr("Edit..."), settingsContent);
         auto *row = createSettingsRow(settingsContent,
             tr("Detach Speed"),
-            detachSummaryForSettings(m_runtime->detachThreshold),
+            detachSummaryForSettings(static_cast<int>(m_runtime->environment.detachThreshold())),
             btn,
             &summaryLabel);
         connect(btn, &ElaPushButton::clicked, [this, summaryLabel]() {
             static const QString key = "detachThreshold";
+            int threshold = static_cast<int>(m_runtime->environment.detachThreshold());
             QDialog dialog(this);
             dialog.setWindowTitle(tr("Detach Speed"));
             dialog.setMinimumWidth(360);
@@ -322,11 +320,11 @@ void ShijimaManager::setupSettingsPage() {
 
             auto *slider = new QSlider(Qt::Horizontal, &dialog);
             slider->setRange(0, 200);
-            slider->setValue(m_runtime->detachThreshold);
+            slider->setValue(threshold);
 
             auto *spin = new QSpinBox(&dialog);
             spin->setRange(0, 200);
-            spin->setValue(m_runtime->detachThreshold);
+            spin->setValue(threshold);
 
             connect(slider, &QSlider::valueChanged, spin, &QSpinBox::setValue);
             connect(spin, QOverload<int>::of(&QSpinBox::valueChanged), slider, &QSlider::setValue);
@@ -341,10 +339,11 @@ void ShijimaManager::setupSettingsPage() {
             layout->addWidget(buttons);
 
             if (dialog.exec() == QDialog::Accepted) {
-                m_runtime->detachThreshold = spin->value();
-                m_settings.setValue(key, m_runtime->detachThreshold);
+                m_runtime->environment.setDetachThreshold(spin->value());
+                m_settings->setValue(key, m_runtime->environment.detachThreshold());
                 if (summaryLabel != nullptr) {
-                    summaryLabel->setText(detachSummaryForSettings(m_runtime->detachThreshold));
+                    summaryLabel->setText(detachSummaryForSettings(
+                        static_cast<int>(m_runtime->environment.detachThreshold())));
                 }
             }
         });
@@ -379,7 +378,7 @@ void ShijimaManager::setupSettingsPage() {
 
     {
         static const QString key = "windowedModeBackground";
-        QColor initial = m_settings.value(key, "#FF0000").toString();
+        QColor initial = m_settings->value(key, "#FF0000").toString();
         m_ui->sandboxBackground = initial;
         updateSandboxBackground();
 
@@ -395,7 +394,7 @@ void ShijimaManager::setupSettingsPage() {
             dialog.setCurrentColor(m_ui->sandboxBackground);
             if (dialog.exec() == QDialog::Accepted) {
                 m_ui->sandboxBackground = dialog.selectedColor();
-                m_settings.setValue("windowedModeBackground",
+                m_settings->setValue("windowedModeBackground",
                     ShijimaManagerUiInternal::colorToString(dialog.selectedColor()));
                 updateSandboxBackground();
                 if (summaryLabel != nullptr) {
@@ -412,11 +411,12 @@ void ShijimaManager::setupSettingsPage() {
         auto *btn = new ElaPushButton(tr("Edit..."), settingsContent);
         auto *row = createSettingsRow(settingsContent,
             tr("Scale"),
-            scaleSummaryForSettings(m_runtime->userScale),
+            scaleSummaryForSettings(m_runtime->environment.userScale()),
             btn,
             &summaryLabel);
         connect(btn, &ElaPushButton::clicked, [this, summaryLabel]() {
             static const QString key = "userScale";
+            double scale = m_runtime->environment.userScale();
             QDialog dialog { this };
             dialog.setWindowTitle(tr("Custom Scale"));
             dialog.setMinimumWidth(360);
@@ -426,23 +426,23 @@ void ShijimaManager::setupSettingsPage() {
 
             auto *slider = new QSlider(Qt::Horizontal, &dialog);
             slider->setRange(100, 10000);
-            slider->setValue(static_cast<int>(m_runtime->userScale * 1000));
+            slider->setValue(static_cast<int>(scale * 1000));
 
             auto *spin = new QDoubleSpinBox(&dialog);
             spin->setRange(0.1, 10.0);
             spin->setDecimals(3);
             spin->setSingleStep(0.05);
-            spin->setValue(m_runtime->userScale);
+            spin->setValue(scale);
 
             connect(slider, &QSlider::valueChanged, [this, spin](int v) {
-                m_runtime->userScale = v / 1000.0;
+                m_runtime->environment.setUserScale(v / 1000.0);
                 spin->blockSignals(true);
-                spin->setValue(m_runtime->userScale);
+                spin->setValue(m_runtime->environment.userScale());
                 spin->blockSignals(false);
             });
             connect(spin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
                 [this, slider](double v) {
-                    m_runtime->userScale = v;
+                    m_runtime->environment.setUserScale(v);
                     slider->blockSignals(true);
                     slider->setValue(static_cast<int>(v * 1000));
                     slider->blockSignals(false);
@@ -458,9 +458,10 @@ void ShijimaManager::setupSettingsPage() {
             mainLayout->addWidget(buttons);
 
             if (dialog.exec() == QDialog::Accepted) {
-                m_settings.setValue(key, m_runtime->userScale);
+                m_settings->setValue(key, m_runtime->environment.userScale());
                 if (summaryLabel != nullptr) {
-                    summaryLabel->setText(scaleSummaryForSettings(m_runtime->userScale));
+                    summaryLabel->setText(scaleSummaryForSettings(
+                        m_runtime->environment.userScale()));
                 }
             }
         });
@@ -518,11 +519,11 @@ void ShijimaManager::setupSettingsPage() {
         tr("Control how NeurolingsCE checks GitHub releases and connects to the network."));
 
     {
-        bool initial = m_settings.value("update/checkOnStartup", true).toBool();
+        bool initial = m_settings->value("update/checkOnStartup", true).toBool();
         auto *toggle = new ElaToggleSwitch(settingsContent);
         toggle->setIsToggled(initial);
         connect(toggle, &ElaToggleSwitch::toggled, [this](bool checked) {
-            m_settings.setValue("update/checkOnStartup", checked);
+            m_settings->setValue("update/checkOnStartup", checked);
         });
 
         settingsLayout->addWidget(createSettingsRow(settingsContent,
@@ -536,7 +537,7 @@ void ShijimaManager::setupSettingsPage() {
         auto *btn = new ElaPushButton(tr("Configure..."), settingsContent);
         auto *row = createSettingsRow(settingsContent,
             tr("Update Proxy"),
-            proxySummaryForSettings(m_settings),
+            proxySummaryForSettings(*m_settings),
             btn,
             &summaryLabel);
         connect(btn, &ElaPushButton::clicked, [this, summaryLabel]() {
@@ -560,21 +561,21 @@ void ShijimaManager::setupSettingsPage() {
             modeCombo->addItem(tr("SOCKS5 proxy"), QStringLiteral("socks5"));
 
             int currentIndex = modeCombo->findData(
-                m_settings.value("update/proxyMode", QStringLiteral("system")).toString());
+                m_settings->value("update/proxyMode", QStringLiteral("system")).toString());
             if (currentIndex < 0) {
                 currentIndex = 0;
             }
             modeCombo->setCurrentIndex(currentIndex);
 
             auto *hostEdit = new QLineEdit(
-                m_settings.value("update/proxyHost").toString(), &dialog);
+                m_settings->value("update/proxyHost").toString(), &dialog);
             auto *portSpin = new QSpinBox(&dialog);
             portSpin->setRange(1, 65535);
-            portSpin->setValue(m_settings.value("update/proxyPort", 8080).toInt());
+            portSpin->setValue(m_settings->value("update/proxyPort", 8080).toInt());
             auto *userEdit = new QLineEdit(
-                m_settings.value("update/proxyUsername").toString(), &dialog);
+                m_settings->value("update/proxyUsername").toString(), &dialog);
             auto *passwordEdit = new QLineEdit(
-                m_settings.value("update/proxyPassword").toString(), &dialog);
+                m_settings->value("update/proxyPassword").toString(), &dialog);
             passwordEdit->setEchoMode(QLineEdit::Password);
 
             form->addRow(tr("Mode"), modeCombo);
@@ -602,16 +603,16 @@ void ShijimaManager::setupSettingsPage() {
             layout->addWidget(buttons);
 
             if (dialog.exec() == QDialog::Accepted) {
-                m_settings.setValue("update/proxyMode", modeCombo->currentData().toString());
-                m_settings.setValue("update/proxyHost", hostEdit->text().trimmed());
-                m_settings.setValue("update/proxyPort", portSpin->value());
-                m_settings.setValue("update/proxyUsername", userEdit->text());
-                m_settings.setValue("update/proxyPassword", passwordEdit->text());
+                m_settings->setValue("update/proxyMode", modeCombo->currentData().toString());
+                m_settings->setValue("update/proxyHost", hostEdit->text().trimmed());
+                m_settings->setValue("update/proxyPort", portSpin->value());
+                m_settings->setValue("update/proxyUsername", userEdit->text());
+                m_settings->setValue("update/proxyPassword", passwordEdit->text());
                 if (m_updateManager != nullptr) {
                     m_updateManager->reloadNetworkSettings();
                 }
                 if (summaryLabel != nullptr) {
-                    summaryLabel->setText(proxySummaryForSettings(m_settings));
+                    summaryLabel->setText(proxySummaryForSettings(*m_settings));
                 }
             }
         });
