@@ -168,7 +168,7 @@ void testMascotPatchParsing() {
         { QStringLiteral("behavior"), QStringLiteral("Fall") },
     }, patch, &error), "complete patch should parse");
     expect(patch.hasCompleteAnchor(), "complete patch should have anchor");
-    expect(patch.behavior.value_or({}) == QStringLiteral("Fall"),
+    expect(patch.behavior.value_or(QString()) == QStringLiteral("Fall"),
         "patch should preserve behavior");
 }
 
