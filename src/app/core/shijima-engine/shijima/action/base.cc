@@ -60,8 +60,10 @@ void base::init(mascot::tick &ctx) {
         vars.init(*ctx.script, attr);
         if (requests_broadcast()) {
             auto affordance = vars.get_string("Affordance");
-            if (affordance != "") {
-                server = mascot->env->broadcasts.start_broadcast(
+            if (affordance != "" && mascot->env != nullptr
+                && mascot->env->broadcasts != nullptr)
+            {
+                server = mascot->env->broadcasts->start_broadcast(
                     vars.get_string("Affordance"), mascot->anchor);
                 vars.add_attr({ { "Affordance", "" } });
             }

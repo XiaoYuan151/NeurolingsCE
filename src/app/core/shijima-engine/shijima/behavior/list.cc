@@ -38,6 +38,9 @@ std::vector<std::shared_ptr<base>> list::flatten(scripting::context &ctx) const 
     std::vector<std::shared_ptr<base>> flat;
     if (condition.eval(ctx)) {
         for (auto &behavior : children) {
+            if (behavior == nullptr) {
+                continue;
+            }
             if (behavior->condition.eval(ctx)) {
                 flat.push_back(behavior);
             }

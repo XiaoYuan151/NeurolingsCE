@@ -17,6 +17,7 @@
 // 
 
 #include "manager.hpp"
+#include <stdexcept>
 
 namespace shijima {
 namespace behavior {
@@ -37,7 +38,11 @@ manager::manager(scripting::context &ctx, list initial_list,
 void manager::set_next(std::string const& next_name) {
     next_list = {};
     if (!next_name.empty()) {
-        next_list.children.push_back(initial_list.find(next_name));
+        auto behavior = initial_list.find(next_name);
+        if (behavior == nullptr) {
+            throw std::logic_error("could not find behavior: " + next_name);
+        }
+        next_list.children.push_back(behavior);
     }
     else {
         next_list.sublists.push_back(initial_list);

@@ -389,6 +389,11 @@ void ShijimaManager::tickMascotWidgets() {
                     std::move(product->manager), m_runtime->idCounter++,
                     windowedMode(), mascotParent());
                 child->setEnv(shimeji->env());
+                if (!child->primeInitialFrame()) {
+                    delete child;
+                    breedRequest.available = false;
+                    continue;
+                }
                 child->show();
                 m_runtime->sessions.add(child);
                 refreshMascotCounts(sessions);
@@ -445,6 +450,10 @@ ShijimaWidget *ShijimaManager::spawn(std::string const& name) {
             m_runtime->templates.loadedMascots()[QString::fromStdString(name)],
             std::move(product.manager), m_runtime->idCounter++,
             windowedMode(), mascotParent());
+        if (!shimeji->primeInitialFrame()) {
+            delete shimeji;
+            return nullptr;
+        }
         shimeji->show();
         m_runtime->sessions.add(shimeji);
         env->reset_scale();

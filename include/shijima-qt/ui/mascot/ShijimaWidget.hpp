@@ -55,6 +55,7 @@ public:
         int mascotId, bool windowedMode, QWidget *parent = nullptr);
     explicit ShijimaWidget(ShijimaWidget &old, bool windowedMode,
         QWidget *parent = nullptr);
+    bool primeInitialFrame();
     void tick();
     bool pointInside(QPoint const& point);
     int mascotId() { return m_mascotId; }

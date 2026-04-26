@@ -85,6 +85,30 @@ bool ShijimaWidget::inspectorVisible() {
     return m_inspector != nullptr && m_inspector->isVisible();
 }
 
+bool ShijimaWidget::primeInitialFrame() {
+    try {
+        if (m_mascot->state->active_frame
+            .get_name(m_mascot->state->looking_right).empty())
+        {
+            m_mascot->tick();
+        }
+        updateOffsets();
+        return true;
+    }
+    catch (std::exception &ex) {
+        APP_LOG_ERROR("mascot") << "Failed to initialize mascotId=" << m_mascotId
+            << " name=\"" << m_data->name().toStdString() << "\": " << ex.what();
+    }
+    catch (...) {
+        APP_LOG_ERROR("mascot") << "Failed to initialize mascotId=" << m_mascotId
+            << " name=\"" << m_data->name().toStdString()
+            << "\" with unknown exception";
+    }
+    markForDeletion();
+    close();
+    return false;
+}
+
 bool ShijimaWidget::dragging() const {
     return m_mascot->state->dragging;
 }

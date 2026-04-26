@@ -29,7 +29,10 @@ bool scanmove::requests_broadcast() {
 
 void scanmove::init(mascot::tick &ctx) {
     move::init(ctx);
-    mascot->env->broadcasts.try_connect(client, mascot->anchor.y,
+    if (mascot->env == nullptr || mascot->env->broadcasts == nullptr) {
+        return;
+    }
+    mascot->env->broadcasts->try_connect(client, mascot->anchor.y,
         vars.get_string("Affordance"), vars.get_string("Behavior"),
         vars.get_string("TargetBehavior"));
 }

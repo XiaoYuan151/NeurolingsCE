@@ -21,6 +21,7 @@
 #include <shijima/broadcast/manager.hpp>
 #include <shijima/math.hpp>
 #include <cmath>
+#include <memory>
 #include <random>
 
 namespace shijima {
@@ -318,7 +319,8 @@ public:
         active_scale = scale;
     }
 
-    broadcast::manager broadcasts;
+    std::shared_ptr<broadcast::manager> broadcasts =
+        std::make_shared<broadcast::manager>();
 };
 
 }
