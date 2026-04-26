@@ -24,6 +24,7 @@
 #include <QWidget>
 
 #include <memory>
+#include <string>
 
 #include <shijima/mascot/environment.hpp>
 #include <shijima/mascot/manager.hpp>
@@ -87,9 +88,14 @@ public:
 protected:
     void paintEvent(QPaintEvent *) override;
     void mousePressEvent(QMouseEvent *) override;
+    void mouseMoveEvent(QMouseEvent *) override;
     void mouseReleaseEvent(QMouseEvent *) override;
 private:
     void setDragTarget(ShijimaWidget *target);
+    QPoint envPosFromScreen(QPoint const& screenPos) const;
+    void startHotspotHold(QPoint const& screenPos);
+    bool stopHotspotHold();
+    void repeatHotspotHold();
     bool isMirroredRender() const;
     void closeAction();
     void contextMenuClosed(QCloseEvent *);
@@ -129,5 +135,9 @@ private:
     QPoint m_lastPressGlobalPos;
     QElapsedTimer m_pressElapsedTimer;
     QTimer m_clickResetTimer;
+    QTimer m_hotspotHoldTimer;
+    std::string m_hotspotHoldBehavior;
+    QPoint m_hotspotHoldPressGlobalPos;
+    bool m_hotspotHoldTriggered = false;
     int m_clickCount = 0;
 };

@@ -119,12 +119,20 @@ void manager::next_behavior(std::string const& name) {
     state->queued_behavior = name;
 }
 
-bool manager::trigger_hotspot(math::vec2 cursor) {
+std::string manager::hotspot_behavior(math::vec2 cursor) {
     auto anim_action = dynamic_cast<action::animation *>(action.get());
     if (anim_action == nullptr) {
-        return false;
+        return "";
     }
     std::string behavior = anim_action->hotspot_behavior_at(cursor);
+    if (behavior.empty()) {
+        return "";
+    }
+    return behavior;
+}
+
+bool manager::trigger_hotspot(math::vec2 cursor) {
+    std::string behavior = hotspot_behavior(cursor);
     if (behavior.empty()) {
         return false;
     }

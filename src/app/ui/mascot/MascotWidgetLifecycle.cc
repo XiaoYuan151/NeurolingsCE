@@ -50,6 +50,10 @@ ShijimaWidget::ShijimaWidget(MascotData *mascotData,
     connect(&m_clickResetTimer, &QTimer::timeout, [this]() {
         m_clickCount = 0;
     });
+    m_hotspotHoldTimer.setInterval(220);
+    connect(&m_hotspotHoldTimer, &QTimer::timeout, [this]() {
+        repeatHotspotHold();
+    });
 
     if (!m_windowedMode) {
         setAttribute(Qt::WA_TranslucentBackground);

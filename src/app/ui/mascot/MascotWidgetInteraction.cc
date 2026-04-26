@@ -18,6 +18,7 @@
 
 #include "shijima-qt/ui/mascot/ShijimaWidget.hpp"
 
+#include <QCursor>
 #include <QMouseEvent>
 #include <QSettings>
 #include <QVariant>
@@ -29,6 +30,7 @@
 
 void ShijimaWidget::setDragTarget(ShijimaWidget *target) {
     if (m_dragTarget != nullptr) {
+        m_dragTarget->stopHotspotHold();
         m_dragTarget->m_dragTargetPt = nullptr;
     }
     if (target != nullptr) {
@@ -74,11 +76,21 @@ void ShijimaWidget::mousePressEvent(QMouseEvent *event) {
         // Record press info for click detection
         m_lastPressGlobalPos = mapToGlobal(pos);
         m_pressElapsedTimer.start();
+        m_dragTarget->startHotspotHold(m_lastPressGlobalPos);
     }
     else if (event->button() == Qt::MouseButton::RightButton) {
         auto screenPos = mapToGlobal(pos);
         m_dragTarget->showContextMenu(screenPos);
         setDragTarget(nullptr);
+    }
+}
+
+void ShijimaWidget::mouseMoveEvent(QMouseEvent *event) {
+    if (m_dragTarget != nullptr) {
+        auto currentGlobalPos = mapToGlobal(event->pos());
+        if ((currentGlobalPos - m_lastPressGlobalPos).manhattanLength() > 12) {
+            m_dragTarget->stopHotspotHold();
+        }
     }
 }
 
@@ -96,22 +108,64 @@ void ShijimaWidget::mouseReleaseEvent(QMouseEvent *event) {
         int distance = (releaseGlobalPos - m_lastPressGlobalPos).manhattanLength();
         qint64 elapsed = m_pressElapsedTimer.elapsed();
         ShijimaWidget *clickTarget = m_dragTarget;
+        bool hotspotHoldTriggered = clickTarget->stopHotspotHold();
 
         m_dragTarget->m_mascot->state->dragging = false;
         setDragTarget(nullptr);
 
         // Click threshold: less than 6px movement and less than 400ms
-        if (distance <= 6 && elapsed <= 400) {
+        if (!hotspotHoldTriggered && distance <= 6 && elapsed <= 400) {
             clickTarget->handleClick(releaseGlobalPos);
         }
     }
 }
 
-void ShijimaWidget::handleClick(QPoint const& screenPos) {
+QPoint ShijimaWidget::envPosFromScreen(QPoint const& screenPos) const {
     QPoint envPos = screenPos;
     if (m_windowedMode && parentWidget() != nullptr) {
         envPos = parentWidget()->mapFromGlobal(screenPos);
     }
+    return envPos;
+}
+
+void ShijimaWidget::startHotspotHold(QPoint const& screenPos) {
+    m_hotspotHoldTimer.stop();
+    QPoint envPos = envPosFromScreen(screenPos);
+    m_hotspotHoldBehavior = m_mascot->hotspot_behavior({
+        (double)envPos.x(), (double)envPos.y() });
+    m_hotspotHoldTriggered = false;
+    m_hotspotHoldPressGlobalPos = screenPos;
+    if (!m_hotspotHoldBehavior.empty()) {
+        m_hotspotHoldTimer.start(260);
+    }
+}
+
+bool ShijimaWidget::stopHotspotHold() {
+    bool triggered = m_hotspotHoldTriggered;
+    m_hotspotHoldTimer.stop();
+    m_hotspotHoldBehavior.clear();
+    m_hotspotHoldTriggered = false;
+    return triggered;
+}
+
+void ShijimaWidget::repeatHotspotHold() {
+    if (m_hotspotHoldBehavior.empty()) {
+        m_hotspotHoldTimer.stop();
+        return;
+    }
+    if ((QCursor::pos() - m_hotspotHoldPressGlobalPos).manhattanLength() > 12) {
+        stopHotspotHold();
+        return;
+    }
+    m_mascot->next_behavior(m_hotspotHoldBehavior);
+    m_hotspotHoldTriggered = true;
+    if (m_hotspotHoldTimer.interval() != 220) {
+        m_hotspotHoldTimer.setInterval(220);
+    }
+}
+
+void ShijimaWidget::handleClick(QPoint const& screenPos) {
+    QPoint envPos = envPosFromScreen(screenPos);
     if (m_mascot->trigger_hotspot({ (double)envPos.x(), (double)envPos.y() })) {
         return;
     }
