@@ -147,14 +147,15 @@ void ManagerEnvironmentController::updateScreen(QScreen *screen,
         if (m_previousWindow.available &&
             m_previousWindow.uid == m_currentWindow.uid)
         {
-            env->active_ie.dy = m_currentWindow.y - m_previousWindow.y;
-            if (env->active_ie.dy == 0) {
-                env->active_ie.dy = m_currentWindow.height - m_previousWindow.height;
-            }
-            env->active_ie.dx = m_currentWindow.x - m_previousWindow.x;
-            if (env->active_ie.dx == 0) {
-                env->active_ie.dx = m_currentWindow.width - m_previousWindow.width;
-            }
+            double previousRight = m_previousWindow.x + m_previousWindow.width;
+            double previousBottom = m_previousWindow.y + m_previousWindow.height;
+            double currentRight = m_currentWindow.x + m_currentWindow.width;
+            double currentBottom = m_currentWindow.y + m_currentWindow.height;
+            env->active_ie.set_edge_offsets(
+                m_currentWindow.x - m_previousWindow.x,
+                currentRight - previousRight,
+                m_currentWindow.y - m_previousWindow.y,
+                currentBottom - previousBottom);
 
             if (m_detachThreshold > 0) {
                 double speed = std::sqrt(env->active_ie.dx * env->active_ie.dx
@@ -168,6 +169,10 @@ void ManagerEnvironmentController::updateScreen(QScreen *screen,
                         / (upperBound - m_detachThreshold);
                     env->active_ie.dx *= ratio;
                     env->active_ie.dy *= ratio;
+                    env->active_ie.left_dx *= ratio;
+                    env->active_ie.right_dx *= ratio;
+                    env->active_ie.top_dy *= ratio;
+                    env->active_ie.bottom_dy *= ratio;
                 }
             }
         }

@@ -24,7 +24,6 @@ namespace Platform {
 
 class PrivateActiveWindowObserver {
 private:
-    double m_scaleRatio;
     ActiveWindow m_activeWindow;
 public:
     PrivateActiveWindowObserver();

@@ -183,11 +183,21 @@ void manager::pre_tick() {
         if (state->env->sticky_ie && state->was_on_ie &&
             state->env->floor.y > state->anchor.y)
         {
-            // Try to stick to IE by following its dx/dy.
-            auto anchor = state->anchor;
-            anchor += state->active_ie_offset;
-            if (state->env->active_ie.is_on(anchor)) {
-                state->anchor = anchor;
+            // Try each moving edge independently. Window resize/maximize can
+            // move opposite edges by different amounts.
+            auto const& active_ie = state->env->active_ie;
+            math::vec2 candidates[] = {
+                { state->anchor.x + active_ie.left_dx, state->anchor.y },
+                { state->anchor.x + active_ie.right_dx, state->anchor.y },
+                { state->anchor.x, state->anchor.y + active_ie.top_dy },
+                { state->anchor.x, state->anchor.y + active_ie.bottom_dy },
+                state->anchor + state->active_ie_offset
+            };
+            for (auto const& anchor : candidates) {
+                if (active_ie.is_on(anchor)) {
+                    state->anchor = anchor;
+                    break;
+                }
             }
         }
         state->active_ie_offset = { 0, 0 };

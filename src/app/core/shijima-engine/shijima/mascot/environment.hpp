@@ -168,26 +168,73 @@ public:
     public:
         double dx;
         double dy;
+        double left_dx;
+        double right_dx;
+        double top_dy;
+        double bottom_dy;
         darea(double top, double right, double bottom, double left):
             darea(top, right, bottom, left, 0, 0) {}
         darea(double top, double right, double bottom, double left,
             double dx, double dy):
-            area(top, right, bottom, left), dx(dx), dy(dy) {}
-        darea(): area(), dx(0), dy(0) {}
-        darea(area const& rhs): area(rhs), dx(0), dy(0) {}
+            area(top, right, bottom, left), dx(dx), dy(dy),
+            left_dx(dx), right_dx(dx), top_dy(dy), bottom_dy(dy) {}
+        darea(): area(), dx(0), dy(0),
+            left_dx(0), right_dx(0), top_dy(0), bottom_dy(0) {}
+        darea(area const& rhs): area(rhs), dx(0), dy(0),
+            left_dx(0), right_dx(0), top_dy(0), bottom_dy(0) {}
+        void set_edge_offsets(double leftDx, double rightDx, double topDy,
+            double bottomDy)
+        {
+            left_dx = leftDx;
+            right_dx = rightDx;
+            top_dy = topDy;
+            bottom_dy = bottomDy;
+            dx = std::abs(rightDx) > std::abs(leftDx) ? rightDx : leftDx;
+            dy = std::abs(bottomDy) > std::abs(topDy) ? bottomDy : topDy;
+        }
         darea operator*(double rhs) {
-            return { top * rhs, right * rhs, bottom * rhs, left * rhs,
+            darea result { top * rhs, right * rhs, bottom * rhs, left * rhs,
                 dx * rhs, dy * rhs };
+            result.left_dx = left_dx * rhs;
+            result.right_dx = right_dx * rhs;
+            result.top_dy = top_dy * rhs;
+            result.bottom_dy = bottom_dy * rhs;
+            return result;
         }
         darea &operator*=(double rhs) {
-            return *this = *this * rhs;
+            top *= rhs;
+            right *= rhs;
+            bottom *= rhs;
+            left *= rhs;
+            dx *= rhs;
+            dy *= rhs;
+            left_dx *= rhs;
+            right_dx *= rhs;
+            top_dy *= rhs;
+            bottom_dy *= rhs;
+            return *this;
         }
         darea operator/(double rhs) {
-            return { top / rhs, right / rhs, bottom / rhs, left / rhs,
+            darea result { top / rhs, right / rhs, bottom / rhs, left / rhs,
                 dx / rhs, dy / rhs };
+            result.left_dx = left_dx / rhs;
+            result.right_dx = right_dx / rhs;
+            result.top_dy = top_dy / rhs;
+            result.bottom_dy = bottom_dy / rhs;
+            return result;
         }
         darea &operator/=(double rhs) {
-            return *this = *this / rhs;
+            top /= rhs;
+            right /= rhs;
+            bottom /= rhs;
+            left /= rhs;
+            dx /= rhs;
+            dy /= rhs;
+            left_dx /= rhs;
+            right_dx /= rhs;
+            top_dy /= rhs;
+            bottom_dy /= rhs;
+            return *this;
         }
     };
 
