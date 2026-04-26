@@ -48,6 +48,7 @@ public:
     void reset_position();
     void detach_from_borders();
     void next_behavior(std::string const& name = "");
+    bool trigger_hotspot(math::vec2 cursor);
 
     struct initializer {
         math::vec2 anchor;

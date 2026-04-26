@@ -148,6 +148,31 @@ bool animation::handle_dragging() {
     return true;
 }
 
+std::string animation::hotspot_behavior_at(math::vec2 cursor) {
+    if (!mascot->env->allows_hotspots) {
+        return "";
+    }
+    std::shared_ptr<shijima::animation> anim;
+    try {
+        anim = get_animation();
+    }
+    catch (...) {
+        return "";
+    }
+    math::vec2 topleft;
+    if (mascot->looking_right) {
+        //FIXME: assumes width of 128
+        topleft = mascot->anchor - math::vec2 {
+            128 - mascot->active_frame.anchor.x,
+            mascot->active_frame.anchor.y };
+    }
+    else {
+        topleft = mascot->anchor - mascot->active_frame.anchor;
+    }
+    shijima::hotspot hotspot = anim->hotspot_at(cursor - topleft);
+    return hotspot.valid() ? hotspot.get_behavior() : "";
+}
+
 std::shared_ptr<shijima::animation> &animation::get_animation() {
     if (current_anim_time == mascot->time) {
         return current_anim;

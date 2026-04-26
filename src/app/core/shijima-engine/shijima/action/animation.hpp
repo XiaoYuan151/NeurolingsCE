@@ -41,6 +41,7 @@ protected:
 public:
     virtual bool requests_broadcast() override;
     std::vector<std::shared_ptr<shijima::animation>> animations;
+    std::string hotspot_behavior_at(math::vec2 cursor);
     virtual void init(mascot::tick &ctx) override;
     virtual bool tick() override;
     virtual void finalize() override;

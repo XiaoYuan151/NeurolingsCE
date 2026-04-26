@@ -96,7 +96,7 @@ private:
     void showContextMenu(QPoint const&);
     bool updateOffsets();
     void showSpeechBubble();
-    void handleClick();
+    void handleClick(QPoint const& screenPos);
 #ifdef __linux__
     QRegion m_windowMask;
 #endif

@@ -102,12 +102,20 @@ void ShijimaWidget::mouseReleaseEvent(QMouseEvent *event) {
 
         // Click threshold: less than 6px movement and less than 400ms
         if (distance <= 6 && elapsed <= 400) {
-            clickTarget->handleClick();
+            clickTarget->handleClick(releaseGlobalPos);
         }
     }
 }
 
-void ShijimaWidget::handleClick() {
+void ShijimaWidget::handleClick(QPoint const& screenPos) {
+    QPoint envPos = screenPos;
+    if (m_windowedMode && parentWidget() != nullptr) {
+        envPos = parentWidget()->mapFromGlobal(screenPos);
+    }
+    if (m_mascot->trigger_hotspot({ (double)envPos.x(), (double)envPos.y() })) {
+        return;
+    }
+
     m_clickCount++;
     m_clickResetTimer.start(500); // Reset click count after 500ms of no clicks
 

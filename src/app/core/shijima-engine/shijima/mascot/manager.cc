@@ -17,6 +17,7 @@
 // 
 
 #include "manager.hpp"
+#include "shijima/action/animation.hpp"
 #include "shijima/mascot/environment.hpp"
 #include <stdexcept>
 
@@ -116,6 +117,19 @@ void manager::next_behavior(std::string const& name) {
     tick_ctx.reset();
     state->interaction.finalize();
     state->queued_behavior = name;
+}
+
+bool manager::trigger_hotspot(math::vec2 cursor) {
+    auto anim_action = dynamic_cast<action::animation *>(action.get());
+    if (anim_action == nullptr) {
+        return false;
+    }
+    std::string behavior = anim_action->hotspot_behavior_at(cursor);
+    if (behavior.empty()) {
+        return false;
+    }
+    next_behavior(behavior);
+    return true;
 }
 
 std::shared_ptr<const behavior::base> manager::active_behavior() {
