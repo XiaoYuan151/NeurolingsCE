@@ -18,16 +18,40 @@
 
 #include "shijima-qt/ui/mascot/ShijimaWidget.hpp"
 
+#include <QApplication>
 #include <QBitmap>
 #include <QDir>
 #include <QPainter>
+#include <QScreen>
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 
 #include "Platform/Platform.hpp"
 #include "shijima-qt/AppLog.hpp"
 #include "shijima-qt/AssetLoader.hpp"
+
+namespace {
+
+constexpr double kMinRenderScale = 0.05;
+constexpr double kMaxRenderScale = 20.0;
+constexpr int kMaxMascotWindowExtent = 8192;
+
+int boundedDimension(double value, int fallback = 1) {
+    if (!std::isfinite(value)) {
+        return fallback;
+    }
+    if (value <= 0) {
+        return fallback;
+    }
+    if (value > kMaxMascotWindowExtent) {
+        return kMaxMascotWindowExtent;
+    }
+    return std::max(1, (int)value);
+}
+
+}
 
 Asset const& ShijimaWidget::getActiveAsset() {
     auto &name = m_mascot->state->active_frame.get_name(m_mascot->state->looking_right);
@@ -110,12 +134,25 @@ bool ShijimaWidget::updateOffsets() {
     int originalWidth = asset.originalSize().width();
     int originalHeight = asset.originalSize().height();
     double scale = m_mascot->state->env->get_scale();
-    int screenWidth = (int)(m_mascot->state->env->screen.width()
-        / scale);
-    int screenHeight = (int)(m_mascot->state->env->screen.height()
-        / scale);
-    int windowWidth = (int)(originalWidth / scale);
-    int windowHeight = (int)(originalHeight / scale);
+    if (!std::isfinite(scale) || scale <= 0) {
+        APP_LOG_WARN("mascot") << "Invalid render scale for mascotId="
+            << m_mascotId << " name=\"" << m_data->name().toStdString()
+            << "\"; using fallback scale";
+        scale = 1.0;
+    }
+    scale = std::clamp(scale, kMinRenderScale, kMaxRenderScale);
+    int screenWidth = boundedDimension(
+        m_mascot->state->env->screen.width() / scale,
+        QApplication::primaryScreen() == nullptr
+            ? kMaxMascotWindowExtent
+            : QApplication::primaryScreen()->geometry().width());
+    int screenHeight = boundedDimension(
+        m_mascot->state->env->screen.height() / scale,
+        QApplication::primaryScreen() == nullptr
+            ? kMaxMascotWindowExtent
+            : QApplication::primaryScreen()->geometry().height());
+    int windowWidth = boundedDimension(originalWidth / scale);
+    int windowHeight = boundedDimension(originalHeight / scale);
 
     if (windowWidth != m_windowWidth) {
         m_windowWidth = windowWidth;

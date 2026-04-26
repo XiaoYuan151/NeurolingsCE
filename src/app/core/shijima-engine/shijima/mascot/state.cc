@@ -22,7 +22,7 @@ namespace shijima {
 namespace mascot {
 
 void state::roll_dcursor() {
-    int roller_size = env->subtick_count + 1;
+    int roller_size = env == nullptr ? 2 : env->sanitized_subtick_count() + 1;
     if ((int)stored_dcursor_data.size() != roller_size) {
         stored_dcursor = { 0, 0, 0, 0 };
         stored_dcursor_data.resize(roller_size);

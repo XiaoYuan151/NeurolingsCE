@@ -65,7 +65,8 @@ bool manager::action_tick() {
     bool did_tick = action->subtick(state->next_subtick);
     bool ret = ignore_did_tick || did_tick;
     if (ret) {
-        state->next_subtick = (state->next_subtick + 1) % state->env->subtick_count;
+        state->next_subtick = (state->next_subtick + 1)
+            % state->env->sanitized_subtick_count();
     }
     return ret;
 }
@@ -74,7 +75,7 @@ void manager::reset_position() {
     auto &screen = state->env->screen;
     if (screen.width() >= 100 && screen.height() >= 100) {
         double new_x = screen.left + 50 + state->env->random((int)screen.width() - 50);
-        double new_y = screen.top + 50 + state->env->random((int)screen.width() - 50);
+        double new_y = screen.top + 50 + state->env->random((int)screen.height() - 50);
         state->anchor = { new_x, new_y };
     }
     else {
@@ -208,7 +209,9 @@ void manager::pre_tick() {
 }
 
 void manager::post_tick() {
-    if (state->next_subtick == 1 || state->env->subtick_count == 1) {
+    if (state->next_subtick == 1
+        || state->env->sanitized_subtick_count() == 1)
+    {
         // completed subtick 0
         state->was_on_ie = state->env->active_ie.is_on(state->anchor) &&
             !state->env->floor.is_on(state->anchor);

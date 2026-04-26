@@ -51,7 +51,7 @@ bool fall::subtick(int idx) {
         mascot->looking_right = (velocity.x > 0);
     }
 
-    auto subtick_count = mascot->env->subtick_count;
+    auto subtick_count = mascot->env->sanitized_subtick_count();
 
     math::vec2 resistance;
     resistance.x = vars.get_num("RegistanceX", 0.05);

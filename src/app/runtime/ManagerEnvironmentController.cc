@@ -23,6 +23,7 @@
 #include "shijima-qt/AppLog.hpp"
 #include "shijima-qt/ui/mascot/ShijimaWidget.hpp"
 
+#include <algorithm>
 #include <cmath>
 
 #include <QCursor>
@@ -43,11 +44,17 @@ double ManagerEnvironmentController::detachThreshold() const {
 }
 
 void ManagerEnvironmentController::setUserScale(double scale) {
-    m_userScale = scale;
+    if (!std::isfinite(scale)) {
+        scale = 1.0;
+    }
+    m_userScale = std::clamp(scale, 0.1, 10.0);
 }
 
 void ManagerEnvironmentController::setDetachThreshold(double threshold) {
-    m_detachThreshold = threshold;
+    if (!std::isfinite(threshold)) {
+        threshold = 30.0;
+    }
+    m_detachThreshold = std::max(0.0, threshold);
 }
 
 void ManagerEnvironmentController::setAllowsBreeding(bool allowsBreeding) {
@@ -184,7 +191,10 @@ void ManagerEnvironmentController::updateScreen(QScreen *screen,
     int x = cursor.x(), y = cursor.y();
     env->cursor = { (double)x, (double)y, x - env->cursor.x, y - env->cursor.y };
     env->subtick_count = ShijimaManagerRuntimeInternal::kSubtickCount;
-    env->set_scale(1.0 / std::sqrt(m_userScale));
+    double userScale = std::isfinite(m_userScale) && m_userScale > 0
+        ? m_userScale
+        : 1.0;
+    env->set_scale(1.0 / std::sqrt(userScale));
 }
 
 void ManagerEnvironmentController::updateAll(QWidget *sandboxWidget,

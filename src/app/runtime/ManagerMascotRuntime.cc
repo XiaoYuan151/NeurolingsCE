@@ -39,6 +39,20 @@
 
 using namespace shijima;
 
+namespace {
+
+void refreshMascotCounts(MascotSessionStore& sessions) {
+    long count = sessions.size();
+    for (auto mascot : sessions.mascots()) {
+        if (mascot == nullptr || mascot->env() == nullptr) {
+            continue;
+        }
+        mascot->env()->mascot_count = count;
+    }
+}
+
+}
+
 void ShijimaManager::killAll() {
     m_runtime->sessions.markAllForDeletion();
 }
@@ -316,6 +330,7 @@ bool ShijimaManager::prepareMascotTick() {
 
 void ShijimaManager::tickMascotWidgets() {
     auto &sessions = m_runtime->sessions;
+    refreshMascotCounts(sessions);
     for (auto iter = sessions.mascots().end(); iter != sessions.mascots().begin(); ) {
         --iter;
         ShijimaWidget *shimeji = *iter;
@@ -326,6 +341,7 @@ void ShijimaManager::tickMascotWidgets() {
             ++iter;
             sessions.mascots().erase(erasePos);
             sessions.removeIndex(mascotId);
+            refreshMascotCounts(sessions);
             continue;
         }
 
@@ -375,6 +391,7 @@ void ShijimaManager::tickMascotWidgets() {
                 child->setEnv(shimeji->env());
                 child->show();
                 m_runtime->sessions.add(child);
+                refreshMascotCounts(sessions);
             }
             breedRequest.available = false;
         }

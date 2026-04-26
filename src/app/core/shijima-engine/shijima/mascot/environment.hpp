@@ -278,8 +278,20 @@ public:
     double get_scale() {
         return active_scale;
     }
+    int sanitized_subtick_count() {
+        constexpr int fallback_subtick_count = 4;
+        constexpr int max_subtick_count = 120;
+        if (subtick_count < 1 || subtick_count > max_subtick_count) {
+            subtick_count = fallback_subtick_count;
+        }
+        return subtick_count;
+    }
     void reset_scale() {
         if (active_scale == 1.0) {
+            return;
+        }
+        if (!std::isfinite(active_scale) || active_scale <= 0) {
+            active_scale = 1.0;
             return;
         }
         ceiling /= active_scale;
@@ -291,6 +303,9 @@ public:
         active_scale = 1.0;
     }
     void set_scale(double scale) {
+        if (!std::isfinite(scale) || scale <= 0) {
+            scale = 1.0;
+        }
         if (active_scale != 1.0) {
             reset_scale();
         }

@@ -103,7 +103,7 @@ bool base::subtick(int idx) {
             mascot->anchor = start_anchor;
         }
         mascot->anchor += target_offset *
-            (1 / (double)mascot->env->subtick_count);
+            (1 / (double)mascot->env->sanitized_subtick_count());
         return true;
     }
     else {
