@@ -23,19 +23,21 @@
 #include <QSettings>
 #include <QVariant>
 
-#include <stdexcept>
-
 #include "shijima-qt/ShijimaManager.hpp"
 #include "shijima-qt/ui/widgets/SpeechBubbleWidget.hpp"
 
 void ShijimaWidget::setDragTarget(ShijimaWidget *target) {
+    if (target == m_dragTarget) {
+        return;
+    }
     if (m_dragTarget != nullptr) {
         m_dragTarget->stopHotspotHold();
         m_dragTarget->m_dragTargetPt = nullptr;
     }
     if (target != nullptr) {
         if (target->m_dragTargetPt != nullptr) {
-            throw std::runtime_error("target widget being dragged by multiple widgets");
+            m_dragTarget = nullptr;
+            return;
         }
         m_dragTarget = target;
         m_dragTarget->m_dragTargetPt = &m_dragTarget;
@@ -68,6 +70,10 @@ void ShijimaWidget::mousePressEvent(QMouseEvent *event) {
             return;
         }
     }
+    if (m_dragTarget == nullptr) {
+        event->ignore();
+        return;
+    }
     if (!m_windowedMode) {
         Platform::refreshTopmost(m_dragTarget);
     }
@@ -83,6 +89,10 @@ void ShijimaWidget::mousePressEvent(QMouseEvent *event) {
         m_dragTarget->showContextMenu(screenPos);
         setDragTarget(nullptr);
     }
+}
+
+void ShijimaWidget::mouseDoubleClickEvent(QMouseEvent *event) {
+    mousePressEvent(event);
 }
 
 void ShijimaWidget::mouseMoveEvent(QMouseEvent *event) {
