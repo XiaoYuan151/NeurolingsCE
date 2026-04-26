@@ -119,6 +119,10 @@ void manager::next_behavior(std::string const& name) {
     state->queued_behavior = name;
 }
 
+void manager::prefer_next_behavior(std::string const& name) {
+    behaviors.set_next(name);
+}
+
 std::string manager::hotspot_behavior(math::vec2 cursor) {
     auto anim_action = dynamic_cast<action::animation *>(action.get());
     if (anim_action == nullptr) {

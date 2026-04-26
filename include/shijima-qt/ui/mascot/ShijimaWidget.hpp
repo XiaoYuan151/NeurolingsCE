@@ -96,7 +96,7 @@ private:
     QPoint envPosFromScreen(QPoint const& screenPos) const;
     void startHotspotHold(QPoint const& screenPos);
     bool stopHotspotHold();
-    void repeatHotspotHold();
+    void maintainHotspotHold();
     bool isMirroredRender() const;
     void closeAction();
     void contextMenuClosed(QCloseEvent *);
@@ -136,7 +136,6 @@ private:
     QPoint m_lastPressGlobalPos;
     QElapsedTimer m_pressElapsedTimer;
     QTimer m_clickResetTimer;
-    QTimer m_hotspotHoldTimer;
     std::string m_hotspotHoldBehavior;
     QPoint m_hotspotHoldPressGlobalPos;
     bool m_hotspotHoldTriggered = false;

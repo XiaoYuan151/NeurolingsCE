@@ -139,39 +139,39 @@ QPoint ShijimaWidget::envPosFromScreen(QPoint const& screenPos) const {
 }
 
 void ShijimaWidget::startHotspotHold(QPoint const& screenPos) {
-    m_hotspotHoldTimer.stop();
     QPoint envPos = envPosFromScreen(screenPos);
     m_hotspotHoldBehavior = m_mascot->hotspot_behavior({
         (double)envPos.x(), (double)envPos.y() });
     m_hotspotHoldTriggered = false;
     m_hotspotHoldPressGlobalPos = screenPos;
-    if (!m_hotspotHoldBehavior.empty()) {
-        m_hotspotHoldTimer.start(260);
-    }
 }
 
 bool ShijimaWidget::stopHotspotHold() {
     bool triggered = m_hotspotHoldTriggered;
-    m_hotspotHoldTimer.stop();
     m_hotspotHoldBehavior.clear();
     m_hotspotHoldTriggered = false;
     return triggered;
 }
 
-void ShijimaWidget::repeatHotspotHold() {
+void ShijimaWidget::maintainHotspotHold() {
     if (m_hotspotHoldBehavior.empty()) {
-        m_hotspotHoldTimer.stop();
         return;
     }
     if ((QCursor::pos() - m_hotspotHoldPressGlobalPos).manhattanLength() > 12) {
         stopHotspotHold();
         return;
     }
-    m_mascot->next_behavior(m_hotspotHoldBehavior);
-    m_hotspotHoldTriggered = true;
-    if (m_hotspotHoldTimer.interval() != 220) {
-        m_hotspotHoldTimer.setInterval(220);
+    if (m_pressElapsedTimer.elapsed() < 260) {
+        return;
     }
+    auto active = m_mascot->active_behavior();
+    if (active == nullptr || active->name != m_hotspotHoldBehavior) {
+        m_mascot->next_behavior(m_hotspotHoldBehavior);
+    }
+    else {
+        m_mascot->prefer_next_behavior(m_hotspotHoldBehavior);
+    }
+    m_hotspotHoldTriggered = true;
 }
 
 void ShijimaWidget::handleClick(QPoint const& screenPos) {
