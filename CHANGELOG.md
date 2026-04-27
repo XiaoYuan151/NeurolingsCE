@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.3] - 2026-04-27
+
+### 🚀 Major Changes / 重大变更
+
+#### Stability & Mascot Interaction Fixes / 稳定性与桌宠交互修复
+- **Spawn Stability** - Fixed freezes and crashes that could happen while spawning mascots
+  - 生成稳定性 - 修复桌宠生成时可能出现的卡死与崩溃问题
+- **Hotspot Interaction Recovery** - Restored patpat hotspot clicks and repeated patpat behavior while holding hotspots
+  - 热点交互恢复 - 修复 patpat 热点点击失效，并恢复长按热点时的连续触发行为
+- **Active Window Edge Following** - Fixed mascot behavior when following active window edges
+  - 活动窗口边缘跟随 - 修复桌宠跟随活动窗口边缘时的异常行为
+
+#### Logging & Debugging Improvements / 日志与调试增强
+- **Enhanced Logging System** - Improved application logging and bridged more engine/runtime logs into the app log flow
+  - 日志系统增强 - 改进应用日志系统，并将更多引擎与运行时日志接入应用日志流程
+- **Runtime and CLI Operation Logs** - Added logs for CLI, HTTP API, local IPC, package import, mascot spawn, and shutdown flows
+  - 运行时与 CLI 操作日志 - 为 CLI、HTTP API、本地 IPC、包导入、桌宠生成和关闭流程补充日志
+- **Debug Documentation** - Added debugging and log-location notes to README and README_EN
+  - 调试文档 - 在 README 与 README_EN 中补充日志位置和调试说明
+
+### ✨ Added / 新增功能
+
+- **Detailed CLI logging** - CLI command execution and runtime control now produce clearer diagnostic logs / 新增更详细的 CLI 日志，命令执行与运行时控制更便于排查
+- **Runtime operation logging** - Import, package loading, mascot spawn, close, lifecycle, HTTP, and local IPC flows now include operation logs / 新增运行时操作日志，覆盖导入、包加载、生成、关闭、生命周期、HTTP 与本地 IPC 流程
+- **Debugging documentation** - Added documentation for log files and troubleshooting workflows / 新增日志文件与问题排查流程说明
+
+### 🐛 Fixed / Bug 修复
+
+- Fixed freezes that could occur during mascot spawn / 修复桌宠生成过程中可能出现的卡死问题
+- Fixed crashes that could occur during mascot spawn / 修复桌宠生成过程中可能出现的崩溃问题
+- Fixed crashes that could occur when double-clicking mascots / 修复双击桌宠时可能出现的崩溃问题
+- Fixed broken patpat hotspot clicks / 修复 patpat 热点点击失效的问题
+- Fixed hotspot hold behavior so the hold state remains active as expected / 修复热点长按状态可能提前失效的问题
+- Fixed repeated patpat triggering while holding a hotspot / 修复按住热点时 patpat 无法持续重复触发的问题
+- Fixed active-window edge following behavior / 修复活动窗口边缘跟随异常的问题
+- Fixed inconsistent settings access for environment parameters and related close/API behavior / 修复环境参数设置访问不一致及相关关闭/API 行为问题
+
+### 🔧 Changed / 改进与优化
+
+- **Interaction Experience** - Refined patpat click, hold, and repeated trigger behavior / 交互体验优化 - 调整 patpat 点击、长按和重复触发逻辑
+- **Runtime Safety** - Strengthened boundary handling around spawn, animation, behavior switching, and environment synchronization / 运行时安全性优化 - 增强生成、动画、行为切换和环境同步过程中的边界保护
+- **Settings Management** - Centralized environment parameter handling for scale, detachment threshold, breeding toggle, color, and proxy settings / 设置管理优化 - 集中管理缩放、分离阈值、繁殖开关、颜色和代理等环境参数
+- **Runtime Structure** - Split mascot runtime state and tray-control responsibilities, and extracted mascot command dispatch with core tests / 运行时结构优化 - 拆分桌宠运行时状态与托盘控制职责，并抽离桌宠命令分发与核心测试
+- **Speech Bubble Styling** - Refined speech bubble corner radius and shadow / 对话气泡优化 - 调整桌宠对话气泡圆角与阴影效果
+- **Release Metadata** - Refreshed 0.3.3 version metadata / 发布元数据整理 - 更新 0.3.3 版本元数据
+
+---
+
 ## [0.3.2] - 2026-04-24
 
 ### 🚀 Major Changes / 重大变更
@@ -168,8 +216,12 @@ As a community version of the Neuro mascot, NeurolingsCE is a complete port of t
 
 ## Contributors / 贡献者
 
+### [0.3.3]
+- [@qingchenyouforcc](https://github.com/qingchenyouforcc) - Main development, stability fixes, logging, runtime interaction fixes / 主要开发，完成稳定性修复、日志增强与运行时交互修复
+- [@wyf7685](https://github.com/wyf7685) - CI fixes and code optimization / CI 修复与代码优化
+
 ### [0.3.2]
-- [@qingchenyouforcc](https://github.com/qingchenyouforcc) - Main development, update center, settings page rework, localization updates / 主要开发，完成更新中心、设置页重构与本地化更新
+- [@qingchenyouforcc](https://github.com/qingchenyouforcc) - Main development, mascot package format, metadata, home-page details / 主要开发，完成桌宠包格式、元数据与主页详情展示
 - [@wyf7685](https://github.com/wyf7685) - CI fixes and code optimization / CI 修复与代码优化
 
 ### [0.3.0]
@@ -185,6 +237,7 @@ As a community version of the Neuro mascot, NeurolingsCE is a complete port of t
 
 ---
 
+[0.3.3]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.3.2...0.3.3
 [0.3.2]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.3.1...0.3.2
 [0.3.1]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.3.0...0.3.1
 [0.3.0]: https://github.com/qingchenyouforcc/NeurolingsCE/compare/0.2.0...0.3.0
