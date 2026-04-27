@@ -110,7 +110,7 @@ void SpeechBubbleWidget::paintEvent(QPaintEvent *) {
     painter.setFont(font);
 
     // Bubble body rect (above the tail)
-    QRectF bodyRect(1, 1, width() - 2, height() - m_tailHeight - 2);
+    QRectF bodyRect(2, 2, width() - 4, height() - m_tailHeight - 4);
 
     // Draw bubble body with rounded corners
     QPainterPath bubblePath;
@@ -119,7 +119,7 @@ void SpeechBubbleWidget::paintEvent(QPaintEvent *) {
     // Draw tail (small triangle at bottom center)
     QPointF tailLeft(width() / 2.0 - 8, bodyRect.bottom());
     QPointF tailRight(width() / 2.0 + 8, bodyRect.bottom());
-    QPointF tailTip(width() / 2.0, height() - 1.0);
+    QPointF tailTip(width() / 2.0, height() - 3.0);
 
     QPainterPath tailPath;
     tailPath.moveTo(tailLeft);
@@ -129,9 +129,14 @@ void SpeechBubbleWidget::paintEvent(QPaintEvent *) {
 
     QPainterPath fullPath = bubblePath.united(tailPath);
 
+    QPainterPath shadowPath = fullPath.translated(0, 2);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(30, 32, 36, 38));
+    painter.drawPath(shadowPath);
+
     // Fill and stroke
-    painter.setPen(QPen(QColor(120, 120, 120), 1.5));
-    painter.setBrush(QColor(255, 255, 255, 240));
+    painter.setPen(QPen(QColor(255, 255, 255, 185), 1.2));
+    painter.setBrush(QColor(255, 255, 255, 205));
     painter.drawPath(fullPath);
 
     // Draw text

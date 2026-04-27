@@ -46,7 +46,7 @@ private:
     QPoint m_anchorScreenPos;
     bool m_active = false;
     int m_tailHeight = 12;
-    int m_cornerRadius = 10;
+    int m_cornerRadius = 12;
     int m_padding = 12;
 
     static QMap<QString, QStringList> s_bubbleTextsCache;
