@@ -103,6 +103,26 @@ void syncBundledSkillsForCurrentUser(QCoreApplication *app) {
 #endif
 }
 
+AppLog::Level shijimaLogLevel(uint16_t level) {
+    if (level == SHIJIMA_LOG_EVERYTHING) {
+        return AppLog::Level::Debug;
+    }
+    if ((level & SHIJIMA_LOG_WARNINGS) != 0) {
+        return AppLog::Level::Warning;
+    }
+    return AppLog::Level::Debug;
+}
+
+void installShijimaEngineLogger() {
+#ifdef SHIJIMA_LOGGING_ENABLED
+    shijima::set_logger([](uint16_t level, std::string const& message) {
+        AppLog::write(shijimaLogLevel(level), "engine", message, nullptr, 0, nullptr);
+    });
+    shijima::set_log_level(SHIJIMA_LOG_EVERYTHING);
+    APP_LOG_INFO("startup") << "Shijima engine logging bridge installed";
+#endif
+}
+
 #ifdef _WIN32
 LONG WINAPI appUnhandledExceptionFilter(EXCEPTION_POINTERS *info) {
     std::ostringstream oss;
@@ -144,19 +164,20 @@ int main(int argc, char **argv) {
         QCoreApplication app(argc, argv);
         app.setApplicationName(QStringLiteral(APP_NAME));
         AppLog::initialize(&app);
+        installShijimaEngineLogger();
+        APP_LOG_INFO("startup") << "CLI-in-GUI executable mode selected argc=" << argc
+            << " version=\"" << NEUROLINGSCE_VERSION << "\"";
         std::set_terminate(appTerminateHandler);
 #ifdef _WIN32
         SetUnhandledExceptionFilter(appUnhandledExceptionFilter);
 #endif
         int ret = shijimaRunCli(argc, argv);
+        APP_LOG_INFO("shutdown") << "CLI-in-GUI executable mode finished code=" << ret;
         AppLog::shutdown();
         return ret;
     }
     bool const startedForCli = cliRuntimeMode(argc, argv);
     Platform::initialize(argc, argv);
-    #ifdef SHIJIMA_LOGGING_ENABLED
-        shijima::set_log_level(SHIJIMA_LOG_PARSER | SHIJIMA_LOG_WARNINGS);
-    #endif
     QApplication app(argc, argv);
     app.setApplicationName(QStringLiteral(APP_NAME));
     app.setApplicationDisplayName(QStringLiteral(APP_DISPLAY_NAME));
@@ -165,6 +186,10 @@ int main(int argc, char **argv) {
         app.setQuitOnLastWindowClosed(false);
     }
     AppLog::initialize(&app);
+    installShijimaEngineLogger();
+    APP_LOG_INFO("startup") << "GUI startup initialized argc=" << argc
+        << " cli_runtime=" << (startedForCli ? "1" : "0")
+        << " version=\"" << NEUROLINGSCE_VERSION << "\"";
     std::set_terminate(appTerminateHandler);
 #ifdef _WIN32
     SetUnhandledExceptionFilter(appUnhandledExceptionFilter);
@@ -214,6 +239,7 @@ int main(int argc, char **argv) {
         msg->show();
     }
     int ret = app.exec();
+    APP_LOG_INFO("shutdown") << "Application event loop exited code=" << ret;
     ShijimaManager::finalize();
     AssetLoader::finalize();
     AppLog::shutdown();

@@ -19,6 +19,7 @@
 #pragma once
 
 #include <sstream>
+#include <string>
 
 class QString;
 class QCoreApplication;
@@ -29,7 +30,8 @@ enum class Level {
     Debug,
     Info,
     Warning,
-    Error
+    Error,
+    Critical
 };
 
 void initialize(QCoreApplication *app);
@@ -37,6 +39,9 @@ void shutdown();
 void write(Level level, char const *category, std::string const& message,
     char const *file, int line, char const *function);
 void writeCrash(char const *category, std::string const& message);
+bool isEnabled(Level level);
+Level minimumLevel();
+char const *levelName(Level level);
 QString sessionLogPath();
 QString sessionLogDirectoryPath();
 
@@ -70,3 +75,6 @@ private:
 
 #define APP_LOG_ERROR(category) \
     AppLog::Line(AppLog::Level::Error, (category), __FILE__, __LINE__, __func__).stream()
+
+#define APP_LOG_CRITICAL(category) \
+    AppLog::Line(AppLog::Level::Critical, (category), __FILE__, __LINE__, __func__).stream()

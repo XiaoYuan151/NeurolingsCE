@@ -114,6 +114,7 @@ target_include_directories(NeurolingsShijimaEngine PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/src/app/core/shijima-engine
 )
 target_compile_definitions(NeurolingsShijimaEngine PUBLIC SHIJIMA_DUK_STATIC_BUILD=1)
+target_compile_definitions(NeurolingsShijimaEngine PUBLIC SHIJIMA_LOGGING_ENABLED=1)
 
 if(MSVC)
   set_property(TARGET NeurolingsShijimaEngine PROPERTY MSVC_RUNTIME_LIBRARY "${_shijima_msvc_runtime}")
@@ -372,6 +373,7 @@ target_link_libraries(NeurolingsCE PRIVATE
 target_link_libraries(NeurolingsCECli PRIVATE
   Qt6::Core
   Qt6::Network
+  NeurolingsShijimaEngine
   shimejifinder
 )
 

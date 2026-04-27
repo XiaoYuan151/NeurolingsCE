@@ -24,9 +24,11 @@ namespace shijima {
 #ifdef SHIJIMA_LOGGING_ENABLED
 
 void default_log(std::string const& log);
+void default_log_with_level(uint16_t level, std::string const& log);
 
 static uint16_t log_level = 0;
-static std::function<void(std::string const&)> active_logger = default_log;
+static std::function<void(uint16_t, std::string const&)> active_logger =
+    default_log_with_level;
 
 void set_log_level(uint16_t level) {
     log_level = level;
@@ -36,17 +38,25 @@ uint16_t get_log_level() {
 }
 void log(uint16_t level, std::string const& log) {
     if (log_level & level) {
-        active_logger(log);
+        active_logger(level, log);
     }
 }
 void log(std::string const& msg) {
-    active_logger(msg);
+    active_logger(SHIJIMA_LOG_EVERYTHING, msg);
 }
 void default_log(std::string const& log) {
     std::cerr << log << std::endl;
 }
+void default_log_with_level(uint16_t, std::string const& log) {
+    default_log(log);
+}
 void set_logger(std::function<void(std::string const&)> logger) {
-    active_logger = logger;
+    active_logger = [logger](uint16_t, std::string const& log) {
+        logger(log);
+    };
+}
+void set_logger(std::function<void(uint16_t, std::string const&)> logger) {
+    active_logger = logger ? logger : default_log_with_level;
 }
 
 #endif /* defined(SHIJIMA_LOGGING_ENABLED) */

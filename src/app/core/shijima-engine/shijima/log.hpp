@@ -40,6 +40,7 @@ uint16_t get_log_level();
 void log(uint16_t level, std::string const& log);
 void log(std::string const& log);
 void set_logger(std::function<void(std::string const&)> logger);
+void set_logger(std::function<void(uint16_t, std::string const&)> logger);
 
 #endif
 

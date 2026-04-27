@@ -21,6 +21,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <mutex>
+#include <string>
 #include <QString>
 #include <QDate>
 #include <QDateTime>
@@ -42,6 +43,11 @@ QString g_logDirectoryPath;
 QtMessageHandler g_previousHandler = nullptr;
 thread_local bool g_inMessageHandler = false;
 bool g_mirrorToStderr = false;
+AppLog::Level g_minimumLevel = AppLog::Level::Info;
+
+#ifndef NEUROLINGSCE_VERSION
+#define NEUROLINGSCE_VERSION "unknown"
+#endif
 
 QString applicationNameForFileSystem() {
     QString appName = QCoreApplication::applicationName().trimmed();
@@ -111,18 +117,60 @@ bool tryOpenLogFileAtRoot(QString const& rootDirectoryPath) {
     return true;
 }
 
+int severity(AppLog::Level level) {
+    return static_cast<int>(level);
+}
+
+bool shouldWrite(AppLog::Level level) {
+    return severity(level) >= severity(g_minimumLevel);
+}
+
+QString normalizedLevel(QString value) {
+    return value.trimmed().toLower();
+}
+
+bool parseLevel(QString value, AppLog::Level &level) {
+    value = normalizedLevel(value);
+    if (value.isEmpty()) {
+        return false;
+    }
+    if (value == QStringLiteral("debug")) {
+        level = AppLog::Level::Debug;
+        return true;
+    }
+    if (value == QStringLiteral("info")) {
+        level = AppLog::Level::Info;
+        return true;
+    }
+    if (value == QStringLiteral("warning") || value == QStringLiteral("warn")) {
+        level = AppLog::Level::Warning;
+        return true;
+    }
+    if (value == QStringLiteral("error")) {
+        level = AppLog::Level::Error;
+        return true;
+    }
+    if (value == QStringLiteral("critical") || value == QStringLiteral("fatal")) {
+        level = AppLog::Level::Critical;
+        return true;
+    }
+    return false;
+}
+
 char const *levelName(AppLog::Level level) {
     switch (level) {
         case AppLog::Level::Debug:
             return "DEBUG";
         case AppLog::Level::Info:
-            return "INFO ";
+            return "INFO";
         case AppLog::Level::Warning:
-            return "WARN ";
+            return "WARN";
         case AppLog::Level::Error:
             return "ERROR";
+        case AppLog::Level::Critical:
+            return "CRITICAL";
     }
-    return "INFO ";
+    return "INFO";
 }
 
 AppLog::Level fromQtType(QtMsgType type) {
@@ -134,8 +182,9 @@ AppLog::Level fromQtType(QtMsgType type) {
         case QtWarningMsg:
             return AppLog::Level::Warning;
         case QtCriticalMsg:
-        case QtFatalMsg:
             return AppLog::Level::Error;
+        case QtFatalMsg:
+            return AppLog::Level::Critical;
     }
     return AppLog::Level::Info;
 }
@@ -160,7 +209,7 @@ QString formatLine(AppLog::Level level, char const *category, QString const& mes
 
     QString formatted = QStringLiteral("[%1] [%2] [%3] [tid:%4] %5")
         .arg(timestamp,
-            QString::fromUtf8(levelName(level)),
+            QString::fromUtf8(::levelName(level)),
             QString::fromUtf8(category != nullptr ? category : "app"),
             QString::number(reinterpret_cast<quintptr>(QThread::currentThreadId()), 16),
             message);
@@ -203,9 +252,12 @@ void appMessageHandler(QtMsgType type, QMessageLogContext const& context,
     g_inMessageHandler = true;
     {
         std::lock_guard<std::mutex> lock(g_logMutex);
-        QString line = formatLine(fromQtType(type), context.category, message,
-            context.file, context.line, context.function);
-        writeLineUnlocked(line);
+        AppLog::Level level = fromQtType(type);
+        if (shouldWrite(level)) {
+            QString line = formatLine(level, context.category, message,
+                context.file, context.line, context.function);
+            writeLineUnlocked(line);
+        }
     }
     g_inMessageHandler = false;
 
@@ -220,8 +272,22 @@ namespace AppLog {
 
 void initialize(QCoreApplication *app) {
     std::lock_guard<std::mutex> lock(g_logMutex);
-    g_mirrorToStderr = QProcessEnvironment::systemEnvironment()
-        .value("NEUROLINGSCE_LOG_STDERR") == "1";
+    auto environment = QProcessEnvironment::systemEnvironment();
+    g_mirrorToStderr = environment.value("NEUROLINGSCE_LOG_STDERR") == "1";
+
+    QString configuredLevel = environment.value("NEUROLINGSCE_LOG_LEVEL");
+    bool invalidLevel = false;
+    if (!configuredLevel.trimmed().isEmpty()) {
+        AppLog::Level parsedLevel = Level::Info;
+        if (parseLevel(configuredLevel, parsedLevel)) {
+            g_minimumLevel = parsedLevel;
+        }
+        else {
+            invalidLevel = true;
+            g_minimumLevel = Level::Info;
+        }
+    }
+
     if (g_logFile == nullptr) {
         QString preferredRoot = preferredLogRootDirectory(app);
         if (!tryOpenLogFileAtRoot(preferredRoot)) {
@@ -237,15 +303,28 @@ void initialize(QCoreApplication *app) {
         g_previousHandler = qInstallMessageHandler(appMessageHandler);
     }
 
+    if (invalidLevel) {
+        writeLineUnlocked(formatLine(Level::Warning, "app",
+            QStringLiteral("Invalid NEUROLINGSCE_LOG_LEVEL=\"%1\"; using info")
+                .arg(configuredLevel),
+            __FILE__, __LINE__, __func__));
+    }
     writeLineUnlocked(formatLine(Level::Info, "app",
-        QStringLiteral("Logging initialized. Session log: %1").arg(sessionLogPath()),
+        QStringLiteral("Logging initialized. app=%1 version=%2 min_level=%3 stderr=%4 session_log=%5")
+            .arg(QCoreApplication::applicationName(),
+                QStringLiteral(NEUROLINGSCE_VERSION),
+                QString::fromUtf8(levelName(g_minimumLevel)),
+                g_mirrorToStderr ? QStringLiteral("1") : QStringLiteral("0"),
+                sessionLogPath()),
         __FILE__, __LINE__, __func__));
 }
 
 void shutdown() {
     std::lock_guard<std::mutex> lock(g_logMutex);
-    writeLineUnlocked(formatLine(Level::Info, "app", QStringLiteral("Logging shutdown"),
-        __FILE__, __LINE__, __func__));
+    if (shouldWrite(Level::Info)) {
+        writeLineUnlocked(formatLine(Level::Info, "app", QStringLiteral("Logging shutdown"),
+            __FILE__, __LINE__, __func__));
+    }
     if (g_previousHandler != nullptr) {
         qInstallMessageHandler(g_previousHandler);
         g_previousHandler = nullptr;
@@ -262,12 +341,29 @@ void write(Level level, char const *category, std::string const& message,
     char const *file, int line, char const *function)
 {
     std::lock_guard<std::mutex> lock(g_logMutex);
+    if (!shouldWrite(level)) {
+        return;
+    }
     writeLineUnlocked(formatLine(level, category,
         QString::fromUtf8(message.c_str()), file, line, function));
 }
 
 void writeCrash(char const *category, std::string const& message) {
-    write(Level::Error, category, message, nullptr, 0, nullptr);
+    write(Level::Critical, category, message, nullptr, 0, nullptr);
+}
+
+bool isEnabled(Level level) {
+    std::lock_guard<std::mutex> lock(g_logMutex);
+    return shouldWrite(level);
+}
+
+Level minimumLevel() {
+    std::lock_guard<std::mutex> lock(g_logMutex);
+    return g_minimumLevel;
+}
+
+char const *levelName(Level level) {
+    return ::levelName(level);
 }
 
 QString sessionLogPath() {

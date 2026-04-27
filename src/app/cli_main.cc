@@ -20,6 +20,7 @@
 
 #include "shijima-qt/AppLog.hpp"
 #include "shijima-qt/cli.hpp"
+#include <shijima/log.hpp>
 
 #include <exception>
 #include <sstream>
@@ -29,6 +30,26 @@
 #endif
 
 namespace {
+
+AppLog::Level shijimaLogLevel(uint16_t level) {
+    if (level == SHIJIMA_LOG_EVERYTHING) {
+        return AppLog::Level::Debug;
+    }
+    if ((level & SHIJIMA_LOG_WARNINGS) != 0) {
+        return AppLog::Level::Warning;
+    }
+    return AppLog::Level::Debug;
+}
+
+void installShijimaEngineLogger() {
+#ifdef SHIJIMA_LOGGING_ENABLED
+    shijima::set_logger([](uint16_t level, std::string const& message) {
+        AppLog::write(shijimaLogLevel(level), "engine", message, nullptr, 0, nullptr);
+    });
+    shijima::set_log_level(SHIJIMA_LOG_EVERYTHING);
+    APP_LOG_INFO("startup") << "Shijima engine logging bridge installed";
+#endif
+}
 
 #ifdef _WIN32
 LONG WINAPI cliUnhandledExceptionFilter(EXCEPTION_POINTERS *info) {
@@ -70,11 +91,15 @@ int main(int argc, char **argv) {
     QCoreApplication app(argc, argv);
     app.setApplicationName(QStringLiteral(APP_NAME));
     AppLog::initialize(&app);
+    installShijimaEngineLogger();
+    APP_LOG_INFO("startup") << "CLI executable startup argc=" << argc
+        << " version=\"" << NEUROLINGSCE_VERSION << "\"";
     std::set_terminate(cliTerminateHandler);
 #ifdef _WIN32
     SetUnhandledExceptionFilter(cliUnhandledExceptionFilter);
 #endif
     int ret = shijimaRunCli(argc, argv);
+    APP_LOG_INFO("shutdown") << "CLI executable finished code=" << ret;
     AppLog::shutdown();
     return ret;
 }

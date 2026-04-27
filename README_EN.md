@@ -32,6 +32,43 @@ Neurolings Core is the release version of this project, while Neurolings is the 
 
 📖 **[Wiki](https://github.com/qingchenyouforcc/NeurolingsCE/wiki)** — Full documentation including getting started, build guide, architecture, HTTP API, FAQ, and more.
 
+## Logging And Debugging
+
+NeurolingsCE enables session logging by default. Each launch creates a separate log file covering important GUI/CLI startup events, HTTP API calls, Local IPC requests, mascot import/spawn/close flows, package processing, update checks, audio, platform window observation, and crash paths.
+
+Log levels are:
+
+- `debug`: detailed diagnostic information, including sampled or throttled high-frequency runtime state.
+- `info`: normal lifecycle events, service start/stop events, user-visible operations, and success summaries.
+- `warning`: recoverable problems, invalid input, skipped items, or business-level 4xx failures.
+- `error`: failed operations, service errors, import failures, network/parse failures, and issues that need investigation.
+- `critical`: crashes, Qt fatal messages, `std::terminate`, unhandled SEH exceptions, and other unrecoverable failures.
+
+The default minimum level is `info`. To collect deeper diagnostics, set environment variables before starting the app:
+
+```powershell
+$env:NEUROLINGSCE_LOG_LEVEL="debug"
+$env:NEUROLINGSCE_LOG_STDERR="1"
+.\NeurolingsCE.exe
+```
+
+Supported `NEUROLINGSCE_LOG_LEVEL` values are `debug`, `info`, `warning`, `error`, and `critical`. `NEUROLINGSCE_LOG_STDERR=1` mirrors logs to stderr, which is useful when launching from a terminal or debugging the CLI.
+
+Default Windows log directory:
+
+```text
+%LOCALAPPDATA%\NeurolingsCE\log\YYYY-MM-DD\neurolingsce-HH-mm-ss-zzz.log
+```
+
+Linux and macOS prefer Qt's `AppLocalDataLocation/log`; if that is unavailable, the app falls back to `.neurolingsce/log` under the user's home directory. If the preferred directory cannot be created, the app attempts to use `NeurolingsCE/log` under the system temp directory.
+
+For troubleshooting:
+
+1. Set `NEUROLINGSCE_LOG_LEVEL=debug`.
+2. Restart NeurolingsCE or `NeurolingsCE-cli`.
+3. Reproduce the issue.
+4. Attach the newest session log. Logs include paths, IDs, command names, status codes, error summaries, and key counts, but they do not include full request bodies, image data, large XML/JSON payloads, or binary content.
+
 ## Building
 
 ### Prerequisites

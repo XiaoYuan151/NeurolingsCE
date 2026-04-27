@@ -32,6 +32,43 @@ Neurolings Core是该项目的发行版，Neurolings是该项目的懒人包
 
 📖 **[Wiki 文档](https://github.com/qingchenyouforcc/NeurolingsCE/wiki)** — 包含快速开始、构建指南、架构说明、HTTP API、常见问题等完整文档。
 
+## 日志与调试
+
+NeurolingsCE 默认启用 session 日志。每次启动都会创建独立日志文件，用于记录 GUI/CLI 启动、HTTP API、Local IPC、看板娘导入/召唤/关闭、素材包处理、更新检查、音频、平台窗口观察和崩溃路径等关键操作。
+
+日志级别包括：
+
+- `debug`：详细调试信息，包括经过采样或节流的高频运行状态。
+- `info`：正常生命周期、服务启动停止、用户可见操作和成功摘要。
+- `warning`：可恢复异常、无效输入、跳过项或业务 4xx 类失败。
+- `error`：操作失败、服务错误、导入失败、网络/解析失败等需要排查的问题。
+- `critical`：崩溃、Qt fatal、`std::terminate`、SEH 未处理异常等不可恢复错误。
+
+默认最低日志级别为 `info`。需要更详细日志时，可以在启动前设置环境变量：
+
+```powershell
+$env:NEUROLINGSCE_LOG_LEVEL="debug"
+$env:NEUROLINGSCE_LOG_STDERR="1"
+.\NeurolingsCE.exe
+```
+
+支持的 `NEUROLINGSCE_LOG_LEVEL` 值为 `debug`、`info`、`warning`、`error`、`critical`。`NEUROLINGSCE_LOG_STDERR=1` 会把日志同时输出到 stderr，适合从终端启动或调试 CLI。
+
+Windows 默认日志目录：
+
+```text
+%LOCALAPPDATA%\NeurolingsCE\log\YYYY-MM-DD\neurolingsce-HH-mm-ss-zzz.log
+```
+
+Linux/macOS 会优先写入 Qt 的 `AppLocalDataLocation/log`，如果不可用则回退到用户 home 下的 `.neurolingsce/log`；如果首选目录无法创建，程序会尝试写入系统临时目录下的 `NeurolingsCE/log`。
+
+排查问题时，建议按下面步骤收集日志：
+
+1. 设置 `NEUROLINGSCE_LOG_LEVEL=debug`。
+2. 重新启动 NeurolingsCE 或 `NeurolingsCE-cli`。
+3. 复现问题。
+4. 附上最新 session log。日志会记录路径、ID、命令名、状态码、错误摘要和关键计数，但不会记录完整请求体、图片内容、XML/JSON 大文本或二进制内容。
+
 ## 构建
 
 ### 前置依赖
