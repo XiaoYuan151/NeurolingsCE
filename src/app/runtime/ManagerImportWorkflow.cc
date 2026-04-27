@@ -103,6 +103,8 @@ void ShijimaManager::showEvent(QShowEvent *event) {
     if (!m_runtime->importOnShowPath.isEmpty()) {
         QString path = m_runtime->importOnShowPath;
         m_runtime->importOnShowPath = {};
+        APP_LOG_INFO("import") << "Running deferred import path=\""
+            << path.toStdString() << "\"";
         importWithDialog({ path });
     }
     else if (m_runtime->templates.loadedMascots().size() == 1) {
@@ -117,11 +119,14 @@ void ShijimaManager::showEvent(QShowEvent *event) {
 }
 
 void ShijimaManager::importOnShow(QString const& path) {
+    APP_LOG_INFO("import") << "Queued deferred import path=\""
+        << path.toStdString() << "\"";
     m_runtime->importOnShowPath = path;
 }
 
 void ShijimaManager::dragEnterEvent(QDragEnterEvent *event) {
     if (event->mimeData()->hasUrls()) {
+        APP_LOG_DEBUG("import") << "Drag enter accepted for URL payload";
         event->acceptProposedAction();
     }
 }

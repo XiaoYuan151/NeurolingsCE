@@ -43,6 +43,10 @@ QByteArray jsonMessage(QJsonObject const& object) {
     return bytes;
 }
 
+QString objectCommandName(QJsonObject const& object) {
+    return object.value(QStringLiteral("command")).toString(QStringLiteral("<missing>"));
+}
+
 bool parseObject(QByteArray const& bytes, QJsonObject &object, QString &error) {
     QJsonParseError parseError;
     auto document = QJsonDocument::fromJson(bytes, &parseError);
@@ -119,7 +123,29 @@ void handleConnection(QLocalSocket *socket, MascotCommandService &service) {
         return;
     }
 
+    QString commandName = objectCommandName(request);
+    APP_LOG_INFO("ipc") << "IPC request received command=\""
+        << commandName.toStdString() << "\" bytes=" << bytes.size();
     auto response = MascotCommandDispatcher::dispatchRequest(request, service);
+    int status = response.value(QStringLiteral("status")).toInt(
+        response.contains(QStringLiteral("error")) ? 500 : 200);
+    if (response.contains(QStringLiteral("error"))) {
+        auto code = response.value(QStringLiteral("code")).toString();
+        if (status >= 500) {
+            APP_LOG_ERROR("ipc") << "IPC request failed command=\""
+                << commandName.toStdString() << "\" status=" << status
+                << " code=\"" << code.toStdString() << "\"";
+        }
+        else {
+            APP_LOG_WARN("ipc") << "IPC request rejected command=\""
+                << commandName.toStdString() << "\" status=" << status
+                << " code=\"" << code.toStdString() << "\"";
+        }
+    }
+    else {
+        APP_LOG_DEBUG("ipc") << "IPC request succeeded command=\""
+            << commandName.toStdString() << "\"";
+    }
     if (!writeMessage(*socket, response, 2000, error)) {
         APP_LOG_WARN("ipc") << error.toStdString();
     }
@@ -147,6 +173,8 @@ void ShijimaLocalApi::start(QString const& serverName) {
     stop();
     m_serverName = serverName;
     m_stopRequested.store(false);
+    APP_LOG_INFO("ipc") << "Starting local IPC server name=\""
+        << m_serverName.toStdString() << "\"";
     m_thread = std::make_unique<std::thread>([this]() {
         QLocalServer server;
         if (!listenWithRecovery(server, m_serverName)) {
@@ -180,6 +208,8 @@ void ShijimaLocalApi::start(QString const& serverName) {
 void ShijimaLocalApi::stop() {
     m_stopRequested.store(true);
     if (m_thread != nullptr) {
+        APP_LOG_INFO("ipc") << "Stopping local IPC server name=\""
+            << m_serverName.toStdString() << "\"";
         QLocalSocket wakeSocket;
         wakeSocket.connectToServer(m_serverName);
         wakeSocket.waitForConnected(100);

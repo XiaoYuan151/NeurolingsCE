@@ -442,12 +442,26 @@ QString cachePathForName(QString const& cacheRootPath, QString const& name) {
 bool inspectPackage(QString const& packagePath, MascotMetadata &metadata,
     QString &errorMessage)
 {
-    return inspectEntries(packagePath, metadata, errorMessage);
+    bool ok = inspectEntries(packagePath, metadata, errorMessage);
+    if (ok) {
+        APP_LOG_DEBUG("package") << "Inspected mascot package path=\""
+            << packagePath.toStdString() << "\" name=\""
+            << metadata.name.toStdString() << "\"";
+    }
+    else {
+        APP_LOG_WARN("package") << "Invalid mascot package path=\""
+            << packagePath.toStdString() << "\": "
+            << errorMessage.toStdString();
+    }
+    return ok;
 }
 
 bool extractPackage(QString const& packagePath, QString const& outputPath,
     QString &errorMessage)
 {
+    APP_LOG_INFO("package") << "Extracting mascot package path=\""
+        << packagePath.toStdString() << "\" output=\""
+        << outputPath.toStdString() << "\"";
     shimejifinder::libunarr::archive archive;
     if (!openPackage(packagePath, archive, errorMessage)) {
         return false;
@@ -471,16 +485,22 @@ bool extractPackage(QString const& packagePath, QString const& outputPath,
     }
     if (!added) {
         errorMessage = QStringLiteral("Package does not contain any supported files");
+        APP_LOG_WARN("package") << "Mascot package has no supported files path=\""
+            << packagePath.toStdString() << "\"";
         return false;
     }
 
     ExactPathExtractor extractor(outputPath);
     try {
         static_cast<shimejifinder::archive&>(archive).extract(&extractor);
+        APP_LOG_INFO("package") << "Extracted mascot package path=\""
+            << packagePath.toStdString() << "\"";
         return true;
     }
     catch (std::exception const& ex) {
         errorMessage = QString::fromUtf8(ex.what());
+        APP_LOG_ERROR("package") << "Failed to extract mascot package path=\""
+            << packagePath.toStdString() << "\": " << ex.what();
         return false;
     }
 }
@@ -488,6 +508,9 @@ bool extractPackage(QString const& packagePath, QString const& outputPath,
 bool writePackageFromDirectory(QString const& sourcePath,
     QString const& packagePath, QString &errorMessage)
 {
+    APP_LOG_INFO("package") << "Writing mascot package source=\""
+        << sourcePath.toStdString() << "\" target=\""
+        << packagePath.toStdString() << "\"";
     QFileInfo sourceInfo(sourcePath);
     if (!sourceInfo.exists() || !sourceInfo.isDir()) {
         errorMessage = QStringLiteral("Source mascot directory does not exist");
@@ -530,6 +553,8 @@ bool writePackageFromDirectory(QString const& sourcePath,
     QFile file(packagePath);
     if (!file.open(QFile::WriteOnly | QFile::Truncate)) {
         errorMessage = QStringLiteral("Could not write %1").arg(packagePath);
+        APP_LOG_ERROR("package") << "Could not open mascot package for writing path=\""
+            << packagePath.toStdString() << "\"";
         return false;
     }
 
@@ -549,12 +574,17 @@ bool writePackageFromDirectory(QString const& sourcePath,
     write32(file, centralSize);
     write32(file, centralOffset);
     write16(file, 0);
+    APP_LOG_INFO("package") << "Wrote mascot package target=\""
+        << packagePath.toStdString() << "\" entries=" << entries.size();
     return true;
 }
 
 bool installPackage(QString const& packagePath, QString const& storagePath,
     QString &installedName, QString &errorMessage)
 {
+    APP_LOG_INFO("package") << "Installing mascot package path=\""
+        << packagePath.toStdString() << "\" storage=\""
+        << storagePath.toStdString() << "\"";
     MascotMetadata metadata;
     if (!inspectPackage(packagePath, metadata, errorMessage)) {
         return false;
@@ -568,10 +598,16 @@ bool installPackage(QString const& packagePath, QString const& storagePath,
         QFile::remove(targetPath);
         if (!QFile::copy(sourceInfo.absoluteFilePath(), targetPath)) {
             errorMessage = QStringLiteral("Could not copy package into mascot storage");
+            APP_LOG_ERROR("package") << "Could not copy mascot package source=\""
+                << sourceInfo.absoluteFilePath().toStdString()
+                << "\" target=\"" << targetPath.toStdString() << "\"";
             return false;
         }
     }
     installedName = metadata.name;
+    APP_LOG_INFO("package") << "Installed mascot package name=\""
+        << installedName.toStdString() << "\" target=\""
+        << targetPath.toStdString() << "\"";
     return true;
 }
 
@@ -609,6 +645,9 @@ bool packageLegacyDirectory(QString const& sourcePath,
 std::set<std::string> importArchive(QString const& archivePath,
     QString const& storagePath)
 {
+    APP_LOG_INFO("import") << "Import archive analysis started path=\""
+        << archivePath.toStdString() << "\" storage=\""
+        << storagePath.toStdString() << "\"";
     std::set<std::string> imported;
     QFileInfo archiveInfo(archivePath);
     QString error;
@@ -621,13 +660,20 @@ std::set<std::string> importArchive(QString const& archivePath,
             installedName, error))
         {
             imported.insert(installedName.toStdString());
+            APP_LOG_INFO("import") << "Imported mascot package directly name=\""
+                << installedName.toStdString() << "\"";
             return imported;
         }
+        APP_LOG_WARN("import") << "Direct mascot package install failed path=\""
+            << archiveInfo.absoluteFilePath().toStdString() << "\": "
+            << error.toStdString();
     }
 
     try {
         QTemporaryDir tempDir;
         if (!tempDir.isValid()) {
+            APP_LOG_ERROR("import") << "Could not create temporary directory for import path=\""
+                << archivePath.toStdString() << "\"";
             return imported;
         }
         auto archive = shimejifinder::analyze(archiveInfo.absoluteFilePath().toStdString());
@@ -653,10 +699,16 @@ std::set<std::string> importArchive(QString const& archivePath,
         APP_LOG_ERROR("import") << "Legacy import failed for path=\""
             << archivePath.toStdString() << "\": " << ex.what();
     }
+    APP_LOG_INFO("import") << "Import archive analysis completed path=\""
+        << archivePath.toStdString() << "\" imported=" << imported.size();
     return imported;
 }
 
 void migrateLegacyDirectories(QString const& storagePath) {
+    APP_LOG_INFO("package") << "Migrating legacy mascot directories storage=\""
+        << storagePath.toStdString() << "\"";
+    int migrated = 0;
+    int skipped = 0;
     QDirIterator iter(storagePath, QDir::Dirs | QDir::NoDotAndDotDot,
         QDirIterator::NoIteratorFlags);
     while (iter.hasNext()) {
@@ -677,15 +729,20 @@ void migrateLegacyDirectories(QString const& storagePath) {
                 << entry.absoluteFilePath().toStdString() << "\": "
                 << error.toStdString();
             QFile::remove(tempPackage);
+            ++skipped;
             continue;
         }
         QDir legacyDir(entry.absoluteFilePath());
         if (!legacyDir.removeRecursively()) {
             QFile::remove(tempPackage);
+            ++skipped;
             continue;
         }
         QFile::rename(tempPackage, entry.absoluteFilePath());
+        ++migrated;
     }
+    APP_LOG_INFO("package") << "Legacy mascot migration completed migrated="
+        << migrated << " skipped=" << skipped;
 }
 
 }

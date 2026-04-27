@@ -92,11 +92,15 @@ void sendJson(Response &res, QJsonObject const& object) {
     res.set_content(&bytes[0], bytes.size(), "application/json");
 }
 
-void badRequest(Request const&, Response &res) {
+std::string requestTarget(Request const& req);
+
+void badRequest(Request const& req, Response &res) {
     QJsonObject obj;
     obj["error"] = "400 Bad Request";
     obj["code"] = "bad_request";
     res.status = 400;
+    APP_LOG_WARN("http") << "Rejected bad request " << req.method << " "
+        << requestTarget(req);
     sendJson(res, obj);
 }
 
@@ -112,17 +116,35 @@ std::string requestTarget(Request const& req) {
 
 void sendError(Response &res, MascotCommandStatus const& status) {
     res.status = status.status;
+    if (status.status >= 500) {
+        APP_LOG_ERROR("http") << "Command failed status=" << status.status
+            << " code=\"" << status.code.toStdString() << "\"";
+    }
+    else {
+        APP_LOG_WARN("http") << "Command rejected status=" << status.status
+            << " code=\"" << status.code.toStdString() << "\"";
+    }
     sendJson(res, errorToJson(status));
 }
 
 bool parseSpawnRequest(QJsonObject const& object, SpawnMascotRequest &request) {
     QString parseError;
-    return spawnMascotRequestFromJson(QJsonValue(object), request, &parseError);
+    bool ok = spawnMascotRequestFromJson(QJsonValue(object), request, &parseError);
+    if (!ok) {
+        APP_LOG_WARN("http") << "Invalid spawn request: "
+            << parseError.toStdString();
+    }
+    return ok;
 }
 
 bool parsePatch(QJsonObject const& object, MascotPatch &patch) {
     QString parseError;
-    return mascotPatchFromJson(QJsonValue(object), patch, &parseError);
+    bool ok = mascotPatchFromJson(QJsonValue(object), patch, &parseError);
+    if (!ok) {
+        APP_LOG_WARN("http") << "Invalid mascot patch: "
+            << parseError.toStdString();
+    }
+    return ok;
 }
 
 }

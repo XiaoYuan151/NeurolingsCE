@@ -54,18 +54,26 @@ void refreshMascotCounts(MascotSessionStore& sessions) {
 }
 
 void ShijimaManager::killAll() {
+    APP_LOG_INFO("mascot") << "Marking all mascots for deletion count="
+        << m_runtime->sessions.size();
     m_runtime->sessions.markAllForDeletion();
 }
 
 void ShijimaManager::killAll(QString const& name) {
+    APP_LOG_INFO("mascot") << "Marking mascots for deletion name=\""
+        << name.toStdString() << "\"";
     m_runtime->sessions.markAllForDeletion(name);
 }
 
 void ShijimaManager::killAllButOne(ShijimaWidget *widget) {
+    APP_LOG_INFO("mascot") << "Marking all mascots except one for deletion keep_id="
+        << (widget != nullptr ? widget->mascotId() : -1);
     m_runtime->sessions.markAllButOneForDeletion(widget);
 }
 
 void ShijimaManager::killAllButOne(QString const& name) {
+    APP_LOG_INFO("mascot") << "Marking all mascots except one for deletion name=\""
+        << name.toStdString() << "\"";
     m_runtime->sessions.markAllButOneForDeletion(name);
 }
 
@@ -78,6 +86,7 @@ void ShijimaManager::loadData(MascotData *data) {
 }
 
 void ShijimaManager::loadDefaultMascot() {
+    APP_LOG_INFO("mascot") << "Loading default mascot template";
     auto data = new MascotData { "@", m_runtime->idCounter++ };
     loadData(data);
 }
@@ -198,6 +207,10 @@ void ShijimaManager::refreshListWidget() {
 }
 
 void ShijimaManager::loadAllMascots() {
+    APP_LOG_INFO("mascot") << "Loading mascot library path=\""
+        << m_runtime->mascotsPath.toStdString() << "\"";
+    int loadedCount = 0;
+    int skippedCount = 0;
     QDirIterator iter { m_runtime->mascotsPath, QStringList { QStringLiteral("*.mascot") },
         QDir::Files,
         QDirIterator::NoIteratorFlags };
@@ -209,6 +222,7 @@ void ShijimaManager::loadAllMascots() {
             APP_LOG_WARN("mascot") << "Skipping invalid mascot package path=\""
                 << packagePath.toStdString() << "\": "
                 << errorMessage.toStdString();
+            ++skippedCount;
             continue;
         }
         QString canonicalPath = QFileInfo(packagePath).absoluteFilePath();
@@ -219,11 +233,16 @@ void ShijimaManager::loadAllMascots() {
             QFile::rename(canonicalPath, expectedPath);
         }
         reloadMascot(metadata.name);
+        ++loadedCount;
     }
     refreshListWidget();
+    APP_LOG_INFO("mascot") << "Mascot library loaded packages=" << loadedCount
+        << " skipped=" << skippedCount;
 }
 
 void ShijimaManager::syncMascotLibrary() {
+    APP_LOG_INFO("mascot") << "Syncing mascot library path=\""
+        << m_runtime->mascotsPath.toStdString() << "\"";
     QSet<QString> mascotsOnDisk;
     QDirIterator iter { m_runtime->mascotsPath, QStringList { QStringLiteral("*.mascot") },
         QDir::Files,
@@ -239,8 +258,12 @@ void ShijimaManager::syncMascotLibrary() {
         QString expectedPath = QFileInfo(MascotPackage::packagePathForName(
             m_runtime->mascotsPath, metadata.name)).absoluteFilePath();
         if (canonicalPath != expectedPath) {
-            QFile::remove(expectedPath);
-            QFile::rename(canonicalPath, expectedPath);
+            bool removed = QFile::remove(expectedPath);
+            bool renamed = QFile::rename(canonicalPath, expectedPath);
+            APP_LOG_INFO("mascot") << "Normalized mascot package path from=\""
+                << canonicalPath.toStdString() << "\" to=\""
+                << expectedPath.toStdString() << "\" removed_existing="
+                << (removed ? "1" : "0") << " renamed=" << (renamed ? "1" : "0");
         }
         mascotsOnDisk.insert(metadata.name);
     }
@@ -261,6 +284,8 @@ void ShijimaManager::syncMascotLibrary() {
     }
 
     refreshListWidget();
+    APP_LOG_INFO("mascot") << "Mascot library sync completed disk_templates="
+        << mascotsOnDisk.size();
 }
 
 void ShijimaManager::reloadMascots(std::set<std::string> const& mascots) {
@@ -336,6 +361,8 @@ void ShijimaManager::tickMascotWidgets() {
         ShijimaWidget *shimeji = *iter;
         if (!shimeji->isVisible()) {
             int mascotId = shimeji->mascotId();
+            APP_LOG_INFO("mascot") << "Removing invisible mascot widget id="
+                << mascotId;
             delete shimeji;
             auto erasePos = iter;
             ++iter;
@@ -375,6 +402,8 @@ void ShijimaManager::tickMascotWidgets() {
             breedRequest.name = breedRequest.name.substr(breedRequest.name.rfind('/') + 1);
 
             std::optional<shijima::mascot::factory::product> product;
+            APP_LOG_INFO("mascot") << "Breed request received parent_id="
+                << shimeji->mascotId() << " child_name=\"" << breedRequest.name << "\"";
             try {
                 product = m_runtime->templates.factory().spawn(breedRequest);
             }
@@ -390,6 +419,8 @@ void ShijimaManager::tickMascotWidgets() {
                     windowedMode(), mascotParent());
                 child->setEnv(shimeji->env());
                 if (!child->primeInitialFrame()) {
+                    APP_LOG_WARN("mascot") << "Breed child failed initial frame name=\""
+                        << breedRequest.name << "\"";
                     delete child;
                     breedRequest.available = false;
                     continue;
@@ -397,6 +428,8 @@ void ShijimaManager::tickMascotWidgets() {
                 child->show();
                 m_runtime->sessions.add(child);
                 refreshMascotCounts(sessions);
+                APP_LOG_INFO("mascot") << "Breed request succeeded child_id="
+                    << child->mascotId() << " child_name=\"" << breedRequest.name << "\"";
             }
             breedRequest.available = false;
         }

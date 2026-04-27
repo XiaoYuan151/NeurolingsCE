@@ -17,6 +17,7 @@
 //
 
 #include "shijima-qt/ShijimaManager.hpp"
+#include "shijima-qt/AppLog.hpp"
 #include "shijima-qt/ShijimaHttpApi.hpp"
 #include "shijima-qt/ShijimaLocalApi.hpp"
 
@@ -37,6 +38,7 @@ static ShijimaManager *m_defaultManager = nullptr;
 
 ShijimaManager *ShijimaManager::defaultManager() {
     if (m_defaultManager == nullptr) {
+        APP_LOG_INFO("lifecycle") << "Creating default ShijimaManager";
         m_defaultManager = new ShijimaManager;
     }
     return m_defaultManager;
@@ -44,6 +46,7 @@ ShijimaManager *ShijimaManager::defaultManager() {
 
 void ShijimaManager::finalize() {
     if (m_defaultManager != nullptr) {
+        APP_LOG_INFO("lifecycle") << "Finalizing default ShijimaManager";
         delete m_defaultManager;
         m_defaultManager = nullptr;
     }
@@ -54,6 +57,7 @@ QString const& ShijimaManager::mascotsPath() {
 }
 
 ShijimaManager::~ShijimaManager() {
+    APP_LOG_INFO("lifecycle") << "Destroying ShijimaManager";
     disconnect(qApp, &QGuiApplication::screenAdded,
         this, &ShijimaManager::screenAdded);
     disconnect(qApp, &QGuiApplication::screenRemoved,
@@ -61,18 +65,25 @@ ShijimaManager::~ShijimaManager() {
 }
 
 void ShijimaManager::abortPendingCallbacks() {
+    APP_LOG_DEBUG("lifecycle") << "Aborting pending manager callbacks";
     m_runtime->shuttingDown.store(true);
 }
 
 void ShijimaManager::shutdownForQuit() {
+    APP_LOG_INFO("shutdown") << "Manager shutdown started mascot_count="
+        << m_runtime->sessions.size();
     abortPendingCallbacks();
     ShijimaManagerUiInternal::teardownTrayIcon(m_ui->trayController);
 
     if (m_runtime->mascotTimer > 0) {
+        APP_LOG_DEBUG("shutdown") << "Stopping mascot timer id="
+            << m_runtime->mascotTimer;
         killTimer(m_runtime->mascotTimer);
         m_runtime->mascotTimer = 0;
     }
     if (m_runtime->windowObserverTimer > 0) {
+        APP_LOG_DEBUG("shutdown") << "Stopping window observer timer id="
+            << m_runtime->windowObserverTimer;
         killTimer(m_runtime->windowObserverTimer);
         m_runtime->windowObserverTimer = 0;
     }
@@ -96,6 +107,7 @@ void ShijimaManager::shutdownForQuit() {
         delete m_ui->sandboxWidget;
         m_ui->sandboxWidget = nullptr;
     }
+    APP_LOG_INFO("shutdown") << "Manager shutdown completed";
 }
 
 void ShijimaManager::onTickSync(std::function<void(ShijimaManager *)> callback) {
@@ -118,6 +130,8 @@ void ShijimaManager::onTickSync(std::function<void(ShijimaManager *)> callback) 
 }
 
 void ShijimaManager::closeEvent(QCloseEvent *event) {
+    APP_LOG_INFO("lifecycle") << "Manager close event allow_close="
+        << (m_allowClose ? "1" : "0");
 #if !defined(__APPLE__)
     if (!m_allowClose) {
         event->ignore();

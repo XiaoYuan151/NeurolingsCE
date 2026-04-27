@@ -18,6 +18,7 @@
 
 #include "shijima-qt/MascotCommandService.hpp"
 
+#include "shijima-qt/AppLog.hpp"
 #include "shijima-qt/MascotData.hpp"
 #include "shijima-qt/ShijimaManager.hpp"
 #include "shijima-qt/ui/mascot/ShijimaWidget.hpp"
@@ -149,12 +150,19 @@ MascotCommandStatus MascotCommandService::listMascots(
             out.append(info);
         }
     });
+    APP_LOG_DEBUG("command") << "List mascots selector_present="
+        << (!request.selector.isEmpty() ? "1" : "0") << " count=" << out.size();
     return MascotCommandStatus::success();
 }
 
 MascotCommandStatus MascotCommandService::spawnMascot(
     SpawnMascotRequest const& request, MascotInfo &out) const
 {
+    APP_LOG_INFO("command") << "Spawn mascot request name_present="
+        << (request.name.has_value() ? "1" : "0") << " data_id_present="
+        << (request.dataId.has_value() ? "1" : "0") << " patch_anchor="
+        << (request.patch.hasAnchor() ? "1" : "0") << " patch_behavior="
+        << (request.patch.behavior.has_value() ? "1" : "0");
     auto status = MascotCommandStatus::success();
     m_manager->onTickSync([&status, &request, &out](ShijimaManager *manager) {
         auto mascotName = resolveMascotName(manager, request);
@@ -175,12 +183,23 @@ MascotCommandStatus MascotCommandService::spawnMascot(
         out = buildMascotInfo(widget);
         out.cliLabel = manager->cliLabelForMascot(out.id);
     });
+    if (status.ok()) {
+        APP_LOG_INFO("command") << "Spawn mascot succeeded mascot_id=" << out.id
+            << " name=\"" << out.name.toStdString() << "\"";
+    }
+    else {
+        APP_LOG_WARN("command") << "Spawn mascot failed status=" << status.status
+            << " code=\"" << status.code.toStdString() << "\"";
+    }
     return status;
 }
 
 MascotCommandStatus MascotCommandService::registerCliLabel(
     RegisterCliLabelRequest const& request, CliLabelInfo &out) const
 {
+    APP_LOG_DEBUG("command") << "Register CLI label mascot_id="
+        << request.mascotId << " preferred_present="
+        << (request.label.has_value() ? "1" : "0");
     auto status = MascotCommandStatus::success();
     m_manager->onTickSync([&status, &request, &out](ShijimaManager *manager) {
         QString errorMessage;
@@ -223,9 +242,14 @@ MascotCommandStatus MascotCommandService::getCliLabel(int cliLabel,
 MascotCommandStatus MascotCommandService::alterMascot(int mascotId,
     MascotPatch const& patch, MascotInfo &out) const
 {
+    APP_LOG_INFO("command") << "Alter mascot request mascot_id=" << mascotId
+        << " patch_anchor=" << (patch.hasAnchor() ? "1" : "0")
+        << " patch_behavior=" << (patch.behavior.has_value() ? "1" : "0");
     auto status = MascotCommandStatus::success();
     m_manager->onTickSync([&status, mascotId, &patch, &out](ShijimaManager *manager) {
         if (manager->mascotsById().count(mascotId) != 1) {
+            APP_LOG_WARN("command") << "Alter mascot failed; mascot not found id="
+                << mascotId;
             status = mascotNotFoundStatus();
             return;
         }
@@ -234,6 +258,9 @@ MascotCommandStatus MascotCommandService::alterMascot(int mascotId,
         out = buildMascotInfo(widget);
         out.cliLabel = manager->cliLabelForMascot(mascotId);
     });
+    if (status.ok()) {
+        APP_LOG_INFO("command") << "Alter mascot succeeded mascot_id=" << mascotId;
+    }
     return status;
 }
 
@@ -253,9 +280,12 @@ MascotCommandStatus MascotCommandService::getMascot(int mascotId,
 }
 
 MascotCommandStatus MascotCommandService::dismissMascot(int mascotId) const {
+    APP_LOG_INFO("command") << "Dismiss mascot request mascot_id=" << mascotId;
     auto status = MascotCommandStatus::success();
     m_manager->onTickSync([&status, mascotId](ShijimaManager *manager) {
         if (manager->mascotsById().count(mascotId) != 1) {
+            APP_LOG_WARN("command") << "Dismiss mascot failed; mascot not found id="
+                << mascotId;
             status = mascotNotFoundStatus();
             return;
         }
@@ -268,18 +298,22 @@ MascotCommandStatus MascotCommandService::dismissMascot(int mascotId) const {
 MascotCommandStatus MascotCommandService::dismissAllMascots(
     DismissAllMascotsRequest const& request) const
 {
-    m_manager->onTickSync([&request](ShijimaManager *manager) {
+    int dismissed = 0;
+    m_manager->onTickSync([&request, &dismissed](ShijimaManager *manager) {
         for (auto mascot : manager->mascots()) {
             if (!selectorEval(mascot, request.selector)) {
                 continue;
             }
             manager->clearCliLabelForMascot(mascot->mascotId());
             mascot->markForDeletion();
+            ++dismissed;
         }
         if (request.selector.isEmpty()) {
             manager->clearCliLabels();
         }
     });
+    APP_LOG_INFO("command") << "Dismiss all mascots request selector_present="
+        << (!request.selector.isEmpty() ? "1" : "0") << " dismissed=" << dismissed;
     return MascotCommandStatus::success();
 }
 
@@ -292,6 +326,7 @@ MascotCommandStatus MascotCommandService::listLoadedMascots(
             out.append(buildLoadedMascotInfo(mascot));
         }
     });
+    APP_LOG_DEBUG("command") << "List loaded mascots count=" << out.size();
     return MascotCommandStatus::success();
 }
 
@@ -299,6 +334,8 @@ MascotCommandStatus MascotCommandService::importMascotTemplate(
     QString const& archivePath, QList<LoadedMascotInfo> &out) const
 {
     out.clear();
+    APP_LOG_INFO("command") << "Import mascot template request path=\""
+        << archivePath.toStdString() << "\"";
     if (archivePath.isEmpty()) {
         return MascotCommandStatus::failure(400,
             QStringLiteral("invalid_archive"),
@@ -307,6 +344,8 @@ MascotCommandStatus MascotCommandService::importMascotTemplate(
 
     auto changed = m_manager->import(archivePath);
     if (changed.empty()) {
+        APP_LOG_WARN("command") << "Import mascot template failed path=\""
+            << archivePath.toStdString() << "\"";
         return MascotCommandStatus::failure(400,
             QStringLiteral("import_failed"),
             QStringLiteral("Could not import any mascots from the specified archive"));
@@ -324,16 +363,22 @@ MascotCommandStatus MascotCommandService::importMascotTemplate(
     });
 
     if (out.isEmpty()) {
+        APP_LOG_ERROR("command") << "Import mascot template produced no loaded templates path=\""
+            << archivePath.toStdString() << "\"";
         return MascotCommandStatus::failure(500,
             QStringLiteral("import_failed"),
             QStringLiteral("Imported mascot archive but no templates were loaded"));
     }
+    APP_LOG_INFO("command") << "Import mascot template succeeded loaded="
+        << out.size();
     return MascotCommandStatus::success();
 }
 
 MascotCommandStatus MascotCommandService::removeMascotTemplate(
     QString const& mascotName) const
 {
+    APP_LOG_INFO("command") << "Remove mascot template request name=\""
+        << mascotName.toStdString() << "\"";
     if (mascotName.isEmpty()) {
         return MascotCommandStatus::failure(400,
             QStringLiteral("invalid_mascot_template"),
@@ -346,6 +391,9 @@ MascotCommandStatus MascotCommandService::removeMascotTemplate(
         if (manager->removeMascotTemplate(mascotName, errorMessage)) {
             return;
         }
+        APP_LOG_WARN("command") << "Remove mascot template failed name=\""
+            << mascotName.toStdString() << "\" error=\""
+            << errorMessage.toStdString() << "\"";
         if (errorMessage == QStringLiteral("No such mascot template")) {
             status = mascotTemplateNotFoundStatus();
             return;
@@ -361,6 +409,7 @@ MascotCommandStatus MascotCommandService::removeMascotTemplate(
 }
 
 MascotCommandStatus MascotCommandService::stopRuntime() const {
+    APP_LOG_INFO("command") << "Stop runtime requested";
     QMetaObject::invokeMethod(m_manager, [manager = m_manager]() {
         manager->quitAction();
     }, Qt::QueuedConnection);
@@ -368,6 +417,7 @@ MascotCommandStatus MascotCommandService::stopRuntime() const {
 }
 
 MascotCommandStatus MascotCommandService::showManagerWindow() const {
+    APP_LOG_INFO("command") << "Show manager window requested";
     QMetaObject::invokeMethod(m_manager, [manager = m_manager]() {
         manager->setManagerVisible(true);
     }, Qt::QueuedConnection);

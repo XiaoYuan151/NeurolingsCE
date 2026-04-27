@@ -31,7 +31,8 @@ int shijimaRunCli(int argc, char **argv) {
         APP_LOG_ERROR("cli") << parsed.error.error.toStdString();
         return writeCliError(parsed.global, parsed.error);
     }
-    APP_LOG_INFO("cli") << "CLI command started";
+    APP_LOG_INFO("cli") << "CLI command parsed name=\""
+        << parsed.command.commandName.toStdString() << "\"";
     auto result = executeCliCommand(parsed.command);
     int ret = writeCliOutput(parsed.command, result);
     APP_LOG_INFO("cli") << "CLI command finished exit_code=" << ret;

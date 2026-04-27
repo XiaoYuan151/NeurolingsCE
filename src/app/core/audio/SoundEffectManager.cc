@@ -27,6 +27,8 @@
 
 void SoundEffectManager::play(QString const& name) {
     if (!m_loadedEffects.contains(name)) {
+        APP_LOG_DEBUG("audio") << "Loading sound effect name=\""
+            << name.toStdString() << "\"";
         QUrl url;
         for (QString &searchPath : searchPaths) {
             QString file = QDir::cleanPath(searchPath + QDir::separator() + name);
@@ -44,11 +46,16 @@ void SoundEffectManager::play(QString const& name) {
         effect->setSource(url);
         effect->setLoopCount(1);
         effect->setVolume(1.f);
+        APP_LOG_INFO("audio") << "Sound effect loaded name=\""
+            << name.toStdString() << "\" source=\""
+            << url.toLocalFile().toStdString() << "\"";
     }
     stop();
     QSoundEffect *effect = m_loadedEffects[name];
     effect->play();
     m_activeEffect = effect;
+    APP_LOG_DEBUG("audio") << "Sound effect play requested name=\""
+        << name.toStdString() << "\"";
 }
 
 bool SoundEffectManager::playing() const {
@@ -62,6 +69,7 @@ void SoundEffectManager::stop() {
     if (m_activeEffect != nullptr) {
         m_activeEffect->stop();
         m_activeEffect = nullptr;
+        APP_LOG_DEBUG("audio") << "Active sound effect stopped";
     }
 }
 
@@ -73,7 +81,10 @@ SoundEffectManager::~SoundEffectManager() {
 
 #else
 
-void SoundEffectManager::play(QString const&) {}
+void SoundEffectManager::play(QString const& name) {
+    APP_LOG_DEBUG("audio") << "Ignoring sound effect because Qt Multimedia is disabled name=\""
+        << name.toStdString() << "\"";
+}
 bool SoundEffectManager::playing() const { return true; }
 void SoundEffectManager::stop() {}
 SoundEffectManager::~SoundEffectManager() {}
