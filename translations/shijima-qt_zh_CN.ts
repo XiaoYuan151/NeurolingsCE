@@ -62,6 +62,149 @@
         <source>Show Folder</source>
         <translation>打开文件夹</translation>
     </message>
+    <!-- Create page -->
+    <message>
+        <source>Create</source>
+        <translation>制作</translation>
+    </message>
+    <message>
+        <source>Create Mascot Package</source>
+        <translation>制作桌宠包</translation>
+    </message>
+    <message>
+        <source>Check a Shimeji zip archive, choose the mascots to convert, and write .mascot packages to a folder you choose.</source>
+        <translation>检查 Shimeji zip 压缩包，选择要转换的桌宠，并将 .mascot 包写入你选择的文件夹。</translation>
+    </message>
+    <message>
+        <source>Choose a .zip archive</source>
+        <translation>选择 .zip 压缩包</translation>
+    </message>
+    <message>
+        <source>Choose Zip...</source>
+        <translation>选择 Zip...</translation>
+    </message>
+    <message>
+        <source>Check Content</source>
+        <translation>检查内容</translation>
+    </message>
+    <message>
+        <source>No archive checked yet.</source>
+        <translation>尚未检查压缩包。</translation>
+    </message>
+    <message>
+        <source>Choose an output folder</source>
+        <translation>选择输出文件夹</translation>
+    </message>
+    <message>
+        <source>Choose Folder...</source>
+        <translation>选择文件夹...</translation>
+    </message>
+    <message>
+        <source>Generate .mascot</source>
+        <translation>生成 .mascot</translation>
+    </message>
+    <message>
+        <source>Conversion results will appear here.</source>
+        <translation>转换结果会显示在这里。</translation>
+    </message>
+    <message>
+        <source>Choose Shimeji Zip Archive</source>
+        <translation>选择 Shimeji Zip 压缩包</translation>
+    </message>
+    <message>
+        <source>Zip Archives (*.zip);;All Files (*)</source>
+        <translation>Zip 压缩包 (*.zip);;所有文件 (*)</translation>
+    </message>
+    <message>
+        <source>Archive selected. Run content check before generating.</source>
+        <translation>已选择压缩包。生成前请先检查内容。</translation>
+    </message>
+    <message>
+        <source>Choose Output Folder</source>
+        <translation>选择输出文件夹</translation>
+    </message>
+    <message>
+        <source>Choose a .zip archive first.</source>
+        <translation>请先选择 .zip 压缩包。</translation>
+    </message>
+    <message>
+        <source>Checking archive content...</source>
+        <translation>正在检查压缩包内容...</translation>
+    </message>
+    <message>
+        <source>No Shimeji mascots were found in the archive.</source>
+        <translation>压缩包中没有找到 Shimeji 桌宠。</translation>
+    </message>
+    <message>
+        <source>Found %1 mascot(s), %2 ready to convert.</source>
+        <translation>找到 %1 个桌宠，%2 个可转换。</translation>
+    </message>
+    <message>
+        <source>Choose an output folder first.</source>
+        <translation>请先选择输出文件夹。</translation>
+    </message>
+    <message>
+        <source>Select at least one mascot to convert.</source>
+        <translation>请至少选择一个要转换的桌宠。</translation>
+    </message>
+    <message>
+        <source>Generating .mascot package(s)...</source>
+        <translation>正在生成 .mascot 包...</translation>
+    </message>
+    <message>
+        <source>Ready to convert.</source>
+        <translation>可以转换。</translation>
+    </message>
+    <message>
+        <source>Cannot convert until the missing content is fixed.</source>
+        <translation>补齐缺失内容后才能转换。</translation>
+    </message>
+    <message>
+        <source>Created: %1</source>
+        <translation>已创建：%1</translation>
+    </message>
+    <message>
+        <source>Failed: %1 - %2</source>
+        <translation>失败：%1 - %2</translation>
+    </message>
+    <message>
+        <source>(unknown)</source>
+        <translation>(未知)</translation>
+    </message>
+    <message>
+        <source>No mascots were converted.</source>
+        <translation>没有转换任何桌宠。</translation>
+    </message>
+    <message numerus="yes">
+        <source>Converted %n mascot(s).</source>
+        <translation>
+            <numerusform>已转换 %n 个桌宠。</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Version: %1</source>
+        <translation>版本：%1</translation>
+    </message>
+    <message>
+        <source>Author: %1</source>
+        <translation>作者：%1</translation>
+    </message>
+    <message>
+        <source>Missing actions.xml</source>
+        <translation>缺少 actions.xml</translation>
+    </message>
+    <message>
+        <source>Missing behaviors.xml</source>
+        <translation>缺少 behaviors.xml</translation>
+    </message>
+    <message>
+        <source>Missing img/*.png</source>
+        <translation>缺少 img/*.png</translation>
+    </message>
+    <message>
+        <source>Missing info.json; fallback metadata will be generated</source>
+        <translation>缺少 info.json；将生成备用元数据</translation>
+    </message>
     <!-- Settings page -->
     <message>
         <source>Settings</source>

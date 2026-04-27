@@ -13,6 +13,7 @@
 - 🖥️ 跨平台支持（Windows / Linux / macOS）
 - 🎭 兼容 Shimeji-ee 格式的看板娘资源包
 - 📦 拖放导入看板娘压缩包
+- 🛠️ 制作页 — 检查 Shimeji zip 并转换为 `.mascot`
 - 🪟 窗口模式 — 在独立沙盒窗口中运行看板娘
 - 🖱️ 鼠标交互 — 拖拽、右键菜单
 - 📡 HTTP REST API（`localhost:32456`）
@@ -31,6 +32,10 @@ Neurolings Core是该项目的发行版，Neurolings是该项目的懒人包
 ## 文档
 
 📖 **[Wiki 文档](https://github.com/qingchenyouforcc/NeurolingsCE/wiki)** — 包含快速开始、构建指南、架构说明、HTTP API、常见问题等完整文档。
+
+## 制作
+
+主界面的“制作”页可以把旧 Shimeji `.zip` 资源包转换为 NeurolingsCE 使用的 `.mascot` 包。选择 zip 后先执行内容检查；如果压缩包中包含多只桌宠，可以勾选要转换的条目。转换结果会写入你选择的输出目录，不会自动导入模板库。
 
 ## 日志与调试
 

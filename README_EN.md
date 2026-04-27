@@ -13,6 +13,7 @@ Built with C++17 / Qt6, supporting Windows, Linux, and macOS.
 - 🖥️ Cross-platform support (Windows / Linux / macOS)
 - 🎭 Compatible with Shimeji-ee format mascot packs
 - 📦 Drag-and-drop mascot pack import
+- 🛠️ Create page — check Shimeji zips and convert them to `.mascot`
 - 🪟 Window mode — run mascots in standalone sandbox windows
 - 🖱️ Mouse interaction — drag, right-click menu
 - 📡 HTTP REST API (`localhost:32456`)
@@ -31,6 +32,10 @@ Neurolings Core is the release version of this project, while Neurolings is the 
 ## Documentation
 
 📖 **[Wiki](https://github.com/qingchenyouforcc/NeurolingsCE/wiki)** — Full documentation including getting started, build guide, architecture, HTTP API, FAQ, and more.
+
+## Create
+
+The manager's Create page can convert legacy Shimeji `.zip` packs into NeurolingsCE `.mascot` packages. Choose a zip, run the content check, then select which mascots to convert when the archive contains more than one. Generated packages are written to the output folder you choose and are not imported into the template library automatically.
 
 ## Logging And Debugging
 

@@ -171,7 +171,15 @@ void ShijimaManager::setupHomePage() {
     m_ui->mascotNameLabel->setAlignment(Qt::AlignCenter);
     QFont nameFont = m_ui->mascotNameLabel->font();
     nameFont.setBold(true);
-    nameFont.setPointSize(nameFont.pointSize() + 1);
+    if (nameFont.pointSize() > 0) {
+        nameFont.setPointSize(nameFont.pointSize() + 1);
+    }
+    else if (nameFont.pixelSize() > 0) {
+        nameFont.setPixelSize(nameFont.pixelSize() + 1);
+    }
+    else {
+        nameFont.setPointSizeF(10.0);
+    }
     m_ui->mascotNameLabel->setFont(nameFont);
     detailsLayout->addWidget(m_ui->mascotNameLabel);
 
