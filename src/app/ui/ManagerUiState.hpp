@@ -47,6 +47,7 @@ struct ShijimaManagerUiState {
     QLabel *mascotAuthorLabel = nullptr;
     QLabel *mascotDescriptionLabel = nullptr;
     QWidget *homePage = nullptr;
+    QWidget *createPage = nullptr;
     QWidget *settingsPage = nullptr;
     std::unique_ptr<ManagerTrayController> trayController;
     QString settingsKey;

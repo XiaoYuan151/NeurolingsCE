@@ -27,7 +27,9 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonParseError>
+#include <QMap>
 #include <QSaveFile>
+#include <QSet>
 #include <QTemporaryDir>
 
 #include <algorithm>
@@ -247,6 +249,20 @@ struct ZipEntry {
     quint32 offset = 0;
 };
 
+struct RawLegacyCandidateFlags {
+    bool hasActions = false;
+    bool hasBehaviors = false;
+    bool hasImage = false;
+};
+
+QString normalizedLegacyCandidateName(QString name)
+{
+    if (name.endsWith(QStringLiteral(".mascot"), Qt::CaseInsensitive)) {
+        name.chop(7);
+    }
+    return name;
+}
+
 bool addFileEntry(QString const& root, QString const& filePath,
     std::vector<ZipEntry> &entries, QString &errorMessage)
 {
@@ -269,6 +285,72 @@ bool addFileEntry(QString const& root, QString const& filePath,
     entry.crc = crc32(entry.data);
     entries.push_back(entry);
     return true;
+}
+
+QMap<QString, RawLegacyCandidateFlags> rawLegacyCandidates(QString const& archivePath)
+{
+    QMap<QString, RawLegacyCandidateFlags> candidates;
+    shimejifinder::libunarr::archive archive;
+    QString error;
+    if (!openPackage(archivePath, archive, error)) {
+        return candidates;
+    }
+
+    QFileInfo archiveInfo(archivePath);
+    for (size_t i = 0; i < archive.size(); ++i) {
+        QString path = normalizedArchivePath(QString::fromStdString(archive.at(i)->path()));
+        QString lower = path.toLower();
+        QString root;
+        if (lower.endsWith(QStringLiteral("/actions.xml")) ||
+            lower.endsWith(QStringLiteral("/action.xml")) ||
+            lower.endsWith(QStringLiteral("/one.xml")) ||
+            lower.endsWith(QString::fromUtf8("/\xe5\x8b\x95\xe4\xbd\x9c.xml")))
+        {
+            root = path.left(path.lastIndexOf(QLatin1Char('/')));
+            root = normalizedLegacyCandidateName(root);
+            candidates[root].hasActions = true;
+        }
+        else if (lower == QStringLiteral("actions.xml") ||
+            lower == QStringLiteral("action.xml") ||
+            lower == QStringLiteral("one.xml") ||
+            lower == QString::fromUtf8("\xe5\x8b\x95\xe4\xbd\x9c.xml"))
+        {
+            root = archiveInfo.completeBaseName();
+            candidates[root].hasActions = true;
+        }
+        else if (lower.endsWith(QStringLiteral("/behaviors.xml")) ||
+            lower.endsWith(QStringLiteral("/behavior.xml")) ||
+            lower.endsWith(QStringLiteral("/two.xml")) ||
+            lower.endsWith(QString::fromUtf8("/\xe8\xa1\x8c\xe5\x8b\x95.xml")))
+        {
+            root = path.left(path.lastIndexOf(QLatin1Char('/')));
+            root = normalizedLegacyCandidateName(root);
+            candidates[root].hasBehaviors = true;
+        }
+        else if (lower == QStringLiteral("behaviors.xml") ||
+            lower == QStringLiteral("behavior.xml") ||
+            lower == QStringLiteral("two.xml") ||
+            lower == QString::fromUtf8("\xe8\xa1\x8c\xe5\x8b\x95.xml"))
+        {
+            root = archiveInfo.completeBaseName();
+            candidates[root].hasBehaviors = true;
+        }
+        else {
+            qsizetype imgIndex = lower.indexOf(QStringLiteral("/img/"));
+            if (imgIndex >= 0 && lower.endsWith(QStringLiteral(".png"))) {
+                root = path.left(imgIndex);
+                root = normalizedLegacyCandidateName(root);
+                candidates[root].hasImage = true;
+            }
+            else if (lower.startsWith(QStringLiteral("img/")) &&
+                lower.endsWith(QStringLiteral(".png")))
+            {
+                root = archiveInfo.completeBaseName();
+                candidates[root].hasImage = true;
+            }
+        }
+    }
+    return candidates;
 }
 
 void writeLocalEntry(QFile &file, ZipEntry &entry) {
@@ -325,6 +407,17 @@ void ensureLegacyMetadata(QString const& sourcePath, QString const& fallbackName
     }
 }
 
+void writeFallbackMetadata(QString const& sourcePath, QString const& fallbackName)
+{
+    MascotMetadata metadata;
+    metadata.name = fallbackName;
+    QSaveFile out(QDir(sourcePath).absoluteFilePath(QStringLiteral("info.json")));
+    if (out.open(QFile::WriteOnly)) {
+        out.write(MascotPackage::metadataToJson(metadata));
+        out.commit();
+    }
+}
+
 void tryExtractBubbleContext(QString const& archivePath, QString const& mascotName,
     QString const& targetPath)
 {
@@ -367,6 +460,72 @@ void tryExtractBubbleContext(QString const& archivePath, QString const& mascotNa
         out.write(bytes);
         out.commit();
     }
+}
+
+LegacyMascotCandidate inspectLegacyDirectory(QString const& sourcePath,
+    QString const& fallbackName)
+{
+    LegacyMascotCandidate candidate;
+    candidate.name = fallbackName;
+    candidate.metadata.name = fallbackName;
+
+    QDir sourceDir(sourcePath);
+    QFileInfo actions(sourceDir.absoluteFilePath(QStringLiteral("actions.xml")));
+    QFileInfo behaviors(sourceDir.absoluteFilePath(QStringLiteral("behaviors.xml")));
+    QDir imgDir(sourceDir.absoluteFilePath(QStringLiteral("img")));
+
+    if (!actions.exists() || !actions.isFile()) {
+        candidate.errors.append(QStringLiteral("Missing actions.xml"));
+    }
+    if (!behaviors.exists() || !behaviors.isFile()) {
+        candidate.errors.append(QStringLiteral("Missing behaviors.xml"));
+    }
+    QStringList images = imgDir.entryList(QStringList { QStringLiteral("*.png") },
+        QDir::Files);
+    if (images.isEmpty()) {
+        candidate.errors.append(QStringLiteral("Missing img/*.png"));
+    }
+
+    QFile info(sourceDir.absoluteFilePath(QStringLiteral("info.json")));
+    if (info.exists() && info.open(QFile::ReadOnly)) {
+        try {
+            candidate.metadata = MascotPackage::metadataFromJson(info.readAll());
+            candidate.name = candidate.metadata.name;
+        }
+        catch (std::exception const& ex) {
+            candidate.generatedMetadata = true;
+            candidate.warnings.append(QStringLiteral(
+                "info.json is invalid; fallback metadata will be generated (%1)")
+                .arg(QString::fromUtf8(ex.what())));
+        }
+    }
+    else {
+        candidate.generatedMetadata = true;
+        candidate.warnings.append(QStringLiteral(
+            "Missing info.json; fallback metadata will be generated"));
+    }
+
+    if (candidate.metadata.name.trimmed().isEmpty()) {
+        candidate.metadata.name = fallbackName;
+        candidate.name = fallbackName;
+    }
+    candidate.convertible = candidate.errors.isEmpty();
+    return candidate;
+}
+
+QString uniquePackagePath(QString const& outputPath, QString const& name,
+    QSet<QString> &reserved)
+{
+    QString base = MascotPackage::sanitizedPackageBaseName(name);
+    QDir outputDir(outputPath);
+    QString candidate = outputDir.absoluteFilePath(base + QStringLiteral(".mascot"));
+    int suffix = 2;
+    while (QFileInfo::exists(candidate) || reserved.contains(candidate)) {
+        candidate = outputDir.absoluteFilePath(
+            QStringLiteral("%1-%2.mascot").arg(base).arg(suffix++));
+    }
+    reserved.insert(candidate);
+    return candidate;
 }
 
 }
@@ -640,6 +799,188 @@ bool packageLegacyDirectory(QString const& sourcePath,
     }
     installedName = metadata.name;
     return true;
+}
+
+LegacyArchiveAnalysis analyzeLegacyArchive(QString const& archivePath)
+{
+    APP_LOG_INFO("package") << "Analyzing legacy mascot archive path=\""
+        << archivePath.toStdString() << "\"";
+    LegacyArchiveAnalysis analysis;
+    QFileInfo archiveInfo(archivePath);
+    if (!archiveInfo.exists() || !archiveInfo.isFile()) {
+        analysis.errorMessage = QStringLiteral("Archive does not exist");
+        return analysis;
+    }
+
+    try {
+        QTemporaryDir tempDir;
+        if (!tempDir.isValid()) {
+            analysis.errorMessage = QStringLiteral("Could not create temporary directory");
+            return analysis;
+        }
+
+        auto archive = shimejifinder::analyze(archiveInfo.absoluteFilePath().toStdString());
+        if (!archive) {
+            analysis.errorMessage = QStringLiteral("Could not analyze archive");
+            return analysis;
+        }
+        auto rawCandidates = rawLegacyCandidates(archiveInfo.absoluteFilePath());
+        archive->extract(tempDir.path().toStdString());
+
+        QSet<QString> seenNames;
+        for (auto const& name : archive->shimejis()) {
+            QString qName = QString::fromStdString(name);
+            seenNames.insert(qName);
+            QString sourcePath = QDir(tempDir.path()).absoluteFilePath(
+                qName + QStringLiteral(".mascot"));
+            tryExtractBubbleContext(archiveInfo.absoluteFilePath(), qName, sourcePath);
+            analysis.candidates.append(inspectLegacyDirectory(sourcePath, qName));
+        }
+        for (auto it = rawCandidates.constBegin(); it != rawCandidates.constEnd(); ++it) {
+            QString name = it.key();
+            if (seenNames.contains(name)) {
+                continue;
+            }
+            LegacyMascotCandidate candidate;
+            candidate.name = name;
+            candidate.metadata.name = name;
+            if (!it.value().hasActions) {
+                candidate.errors.append(QStringLiteral("Missing actions.xml"));
+            }
+            if (!it.value().hasBehaviors) {
+                candidate.errors.append(QStringLiteral("Missing behaviors.xml"));
+            }
+            if (!it.value().hasImage) {
+                candidate.errors.append(QStringLiteral("Missing img/*.png"));
+            }
+            if (candidate.errors.isEmpty()) {
+                candidate.errors.append(QStringLiteral(
+                    "Could not recognize this mascot in the archive"));
+            }
+            analysis.candidates.append(candidate);
+        }
+        if (analysis.candidates.isEmpty()) {
+            analysis.errorMessage = QStringLiteral("No Shimeji mascots were found in the archive");
+            return analysis;
+        }
+
+        analysis.ok = std::any_of(analysis.candidates.begin(), analysis.candidates.end(),
+            [](LegacyMascotCandidate const& candidate) {
+                return candidate.convertible;
+            });
+        if (!analysis.ok) {
+            analysis.errorMessage = QStringLiteral("No convertible mascots were found");
+        }
+    }
+    catch (std::exception const& ex) {
+        analysis.errorMessage = QString::fromUtf8(ex.what());
+    }
+    APP_LOG_INFO("package") << "Legacy archive analysis completed path=\""
+        << archivePath.toStdString() << "\" candidates="
+        << analysis.candidates.size() << " ok=" << analysis.ok;
+    return analysis;
+}
+
+QList<LegacyMascotConversionResult> writeLegacyArchiveSelectionAsPackages(
+    QString const& archivePath, QString const& outputPath,
+    QStringList const& selectedNames)
+{
+    APP_LOG_INFO("package") << "Converting legacy archive path=\""
+        << archivePath.toStdString() << "\" output=\""
+        << outputPath.toStdString() << "\" selected=" << selectedNames.size();
+    QList<LegacyMascotConversionResult> results;
+    QFileInfo archiveInfo(archivePath);
+    QDir outputDir(outputPath);
+    if (!archiveInfo.exists() || !archiveInfo.isFile()) {
+        LegacyMascotConversionResult result;
+        result.errorMessage = QStringLiteral("Archive does not exist");
+        results.append(result);
+        return results;
+    }
+    if (!outputDir.exists() && !outputDir.mkpath(QStringLiteral("."))) {
+        LegacyMascotConversionResult result;
+        result.errorMessage = QStringLiteral("Could not create output directory");
+        results.append(result);
+        return results;
+    }
+
+    QSet<QString> selected;
+    for (auto const& name : selectedNames) {
+        selected.insert(name);
+    }
+    QSet<QString> processed;
+
+    try {
+        QTemporaryDir tempDir;
+        if (!tempDir.isValid()) {
+            LegacyMascotConversionResult result;
+            result.errorMessage = QStringLiteral("Could not create temporary directory");
+            results.append(result);
+            return results;
+        }
+
+        auto archive = shimejifinder::analyze(archiveInfo.absoluteFilePath().toStdString());
+        if (!archive) {
+            LegacyMascotConversionResult result;
+            result.errorMessage = QStringLiteral("Could not analyze archive");
+            results.append(result);
+            return results;
+        }
+        archive->extract(tempDir.path().toStdString());
+
+        QSet<QString> reservedOutputPaths;
+        for (auto const& name : archive->shimejis()) {
+            QString qName = QString::fromStdString(name);
+            if (!selected.contains(qName)) {
+                continue;
+            }
+            processed.insert(qName);
+
+            LegacyMascotConversionResult result;
+            result.name = qName;
+            QString sourcePath = QDir(tempDir.path()).absoluteFilePath(
+                qName + QStringLiteral(".mascot"));
+            tryExtractBubbleContext(archiveInfo.absoluteFilePath(), qName, sourcePath);
+
+            auto candidate = inspectLegacyDirectory(sourcePath, qName);
+            result.name = candidate.metadata.name;
+            if (!candidate.convertible) {
+                result.errorMessage = candidate.errors.join(QStringLiteral("; "));
+                results.append(result);
+                continue;
+            }
+
+            ensureLegacyMetadata(sourcePath, qName);
+            if (candidate.generatedMetadata) {
+                writeFallbackMetadata(sourcePath, qName);
+            }
+            QString targetPath = uniquePackagePath(outputPath, candidate.metadata.name,
+                reservedOutputPaths);
+            if (writePackageFromDirectory(sourcePath, targetPath, result.errorMessage)) {
+                result.ok = true;
+                result.packagePath = targetPath;
+            }
+            results.append(result);
+        }
+
+        for (auto const& selectedName : selected) {
+            if (!processed.contains(selectedName)) {
+                LegacyMascotConversionResult result;
+                result.name = selectedName;
+                result.errorMessage = QStringLiteral("Selected mascot was not found");
+                results.append(result);
+            }
+        }
+    }
+    catch (std::exception const& ex) {
+        LegacyMascotConversionResult result;
+        result.errorMessage = QString::fromUtf8(ex.what());
+        results.append(result);
+    }
+
+    APP_LOG_INFO("package") << "Legacy archive conversion completed path=\""
+        << archivePath.toStdString() << "\" results=" << results.size();
+    return results;
 }
 
 std::set<std::string> importArchive(QString const& archivePath,

@@ -195,6 +195,10 @@ void ShijimaLocalApi::start(QString const& serverName) {
                 if (socket == nullptr) {
                     continue;
                 }
+                if (m_stopRequested.load()) {
+                    closeSocket(*socket);
+                    continue;
+                }
                 handleConnection(socket.get(), m_service);
             }
         }

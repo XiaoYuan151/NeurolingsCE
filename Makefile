@@ -36,6 +36,7 @@ SOURCES = src/app/main.cc \
 	src/app/ui/ManagerUiActions.cc \
 	src/app/ui/ManagerTrayIcon.cc \
 	src/app/ui/interface/ManagerAboutSection.cc \
+	src/app/ui/interface/ManagerCreatePage.cc \
 	src/app/ui/interface/ManagerHomePage.cc \
 	src/app/ui/interface/ManagerNavigation.cc \
 	src/app/ui/interface/ManagerSettingsPage.cc \

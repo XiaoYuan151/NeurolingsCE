@@ -19,7 +19,9 @@
 //
 
 #include <QByteArray>
+#include <QList>
 #include <QString>
+#include <QStringList>
 
 #include <set>
 #include <string>
@@ -29,6 +31,28 @@ struct MascotMetadata {
     QString version;
     QString description;
     QString author;
+};
+
+struct LegacyMascotCandidate {
+    QString name;
+    MascotMetadata metadata;
+    bool convertible = false;
+    bool generatedMetadata = false;
+    QStringList warnings;
+    QStringList errors;
+};
+
+struct LegacyArchiveAnalysis {
+    bool ok = false;
+    QString errorMessage;
+    QList<LegacyMascotCandidate> candidates;
+};
+
+struct LegacyMascotConversionResult {
+    QString name;
+    QString packagePath;
+    bool ok = false;
+    QString errorMessage;
 };
 
 namespace MascotPackage {
@@ -51,6 +75,10 @@ bool installPackage(QString const& packagePath, QString const& storagePath,
 bool packageLegacyDirectory(QString const& sourcePath,
     QString const& storagePath, QString const& fallbackName,
     QString &installedName, QString &errorMessage);
+LegacyArchiveAnalysis analyzeLegacyArchive(QString const& archivePath);
+QList<LegacyMascotConversionResult> writeLegacyArchiveSelectionAsPackages(
+    QString const& archivePath, QString const& outputPath,
+    QStringList const& selectedNames);
 std::set<std::string> importArchive(QString const& archivePath,
     QString const& storagePath);
 void migrateLegacyDirectories(QString const& storagePath);

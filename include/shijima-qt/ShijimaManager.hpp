@@ -113,6 +113,7 @@ private:
     void updateSelectedMascotDetails();
     void setupNavigation();
     void setupHomePage();
+    void setupCreatePage();
     void setupSettingsPage();
     void setupAboutPage();
     void showAboutDialog();

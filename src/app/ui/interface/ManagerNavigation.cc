@@ -20,6 +20,7 @@
 
 void ShijimaManager::setupNavigation() {
     setupHomePage();
+    setupCreatePage();
     setupSettingsPage();
     setupAboutPage();
 }

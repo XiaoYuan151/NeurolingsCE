@@ -22,10 +22,17 @@
 
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QTemporaryDir>
 #include <QString>
 
+#include <algorithm>
+#include <cstdint>
 #include <cstdlib>
 #include <iostream>
+#include <vector>
 
 namespace {
 
@@ -37,6 +44,121 @@ void expect(bool condition, char const *message) {
     }
     std::cerr << "FAIL: " << message << std::endl;
     ++g_failures;
+}
+
+quint32 testCrc32(QByteArray const& bytes) {
+    static quint32 table[256] = {};
+    static bool initialized = false;
+    if (!initialized) {
+        for (quint32 i = 0; i < 256; ++i) {
+            quint32 c = i;
+            for (int j = 0; j < 8; ++j) {
+                c = (c & 1) ? (0xedb88320U ^ (c >> 1)) : (c >> 1);
+            }
+            table[i] = c;
+        }
+        initialized = true;
+    }
+
+    quint32 c = 0xffffffffU;
+    for (auto ch : bytes) {
+        c = table[(c ^ static_cast<quint8>(ch)) & 0xff] ^ (c >> 8);
+    }
+    return c ^ 0xffffffffU;
+}
+
+void testWrite16(QFile &file, quint16 value) {
+    char data[2] = {
+        static_cast<char>(value & 0xff),
+        static_cast<char>((value >> 8) & 0xff),
+    };
+    file.write(data, 2);
+}
+
+void testWrite32(QFile &file, quint32 value) {
+    char data[4] = {
+        static_cast<char>(value & 0xff),
+        static_cast<char>((value >> 8) & 0xff),
+        static_cast<char>((value >> 16) & 0xff),
+        static_cast<char>((value >> 24) & 0xff),
+    };
+    file.write(data, 4);
+}
+
+struct TestZipEntry {
+    QString name;
+    QByteArray data;
+    quint32 crc = 0;
+    quint32 offset = 0;
+};
+
+void testWriteZip(QString const& path, std::vector<TestZipEntry> entries) {
+    QFile file(path);
+    expect(file.open(QFile::WriteOnly | QFile::Truncate),
+        "test zip should be writable");
+    for (auto &entry : entries) {
+        QByteArray name = entry.name.toUtf8();
+        entry.crc = testCrc32(entry.data);
+        entry.offset = static_cast<quint32>(file.pos());
+        testWrite32(file, 0x04034b50);
+        testWrite16(file, 20);
+        testWrite16(file, 0x0800);
+        testWrite16(file, 0);
+        testWrite16(file, 0);
+        testWrite16(file, 0);
+        testWrite32(file, entry.crc);
+        testWrite32(file, static_cast<quint32>(entry.data.size()));
+        testWrite32(file, static_cast<quint32>(entry.data.size()));
+        testWrite16(file, static_cast<quint16>(name.size()));
+        testWrite16(file, 0);
+        file.write(name);
+        file.write(entry.data);
+    }
+    quint32 centralOffset = static_cast<quint32>(file.pos());
+    for (auto const& entry : entries) {
+        QByteArray name = entry.name.toUtf8();
+        testWrite32(file, 0x02014b50);
+        testWrite16(file, 20);
+        testWrite16(file, 20);
+        testWrite16(file, 0x0800);
+        testWrite16(file, 0);
+        testWrite16(file, 0);
+        testWrite16(file, 0);
+        testWrite32(file, entry.crc);
+        testWrite32(file, static_cast<quint32>(entry.data.size()));
+        testWrite32(file, static_cast<quint32>(entry.data.size()));
+        testWrite16(file, static_cast<quint16>(name.size()));
+        testWrite16(file, 0);
+        testWrite16(file, 0);
+        testWrite16(file, 0);
+        testWrite16(file, 0);
+        testWrite32(file, 0);
+        testWrite32(file, entry.offset);
+        file.write(name);
+    }
+    quint32 centralSize = static_cast<quint32>(file.pos()) - centralOffset;
+    testWrite32(file, 0x06054b50);
+    testWrite16(file, 0);
+    testWrite16(file, 0);
+    testWrite16(file, static_cast<quint16>(entries.size()));
+    testWrite16(file, static_cast<quint16>(entries.size()));
+    testWrite32(file, centralSize);
+    testWrite32(file, centralOffset);
+    testWrite16(file, 0);
+}
+
+QByteArray minimalActionsXml() {
+    return QByteArrayLiteral(
+        "<Mascot><ActionList><Action Name=\"Look\"><Animation>"
+        "<Pose Image=\"shime1.png\" /></Animation></Action></ActionList></Mascot>");
+}
+
+QByteArray minimalBehaviorsXml() {
+    return QByteArrayLiteral("<Mascot><BehaviorList /></Mascot>");
+}
+
+QByteArray minimalPngBytes() {
+    return QByteArrayLiteral("png");
 }
 
 struct FakeMascotService {
@@ -226,6 +348,86 @@ void testMascotPackageNames() {
         QStringLiteral(".._Name"), "path separators should not survive package names");
 }
 
+void testLegacyArchiveAnalysisAndConversion() {
+    QTemporaryDir temp;
+    expect(temp.isValid(), "temporary directory should be available");
+    QDir tempDir(temp.path());
+    QString archivePath = tempDir.absoluteFilePath(QStringLiteral("legacy.zip"));
+    QString outputPath = tempDir.absoluteFilePath(QStringLiteral("out"));
+    QDir().mkpath(outputPath);
+
+    MascotMetadata alphaMetadata;
+    alphaMetadata.name = QStringLiteral("Alpha");
+    alphaMetadata.version = QStringLiteral("1.0");
+    alphaMetadata.author = QStringLiteral("tester");
+
+    std::vector<TestZipEntry> entries {
+        { QStringLiteral("Alpha/actions.xml"), minimalActionsXml() },
+        { QStringLiteral("Alpha/behaviors.xml"), minimalBehaviorsXml() },
+        { QStringLiteral("Alpha/img/shime1.png"), minimalPngBytes() },
+        { QStringLiteral("Alpha/info.json"), MascotPackage::metadataToJson(alphaMetadata) },
+        { QStringLiteral("Beta/actions.xml"), minimalActionsXml() },
+        { QStringLiteral("Beta/behaviors.xml"), minimalBehaviorsXml() },
+        { QStringLiteral("Beta/img/shime1.png"), minimalPngBytes() },
+        { QStringLiteral("Broken/behaviors.xml"), minimalBehaviorsXml() },
+        { QStringLiteral("Broken/img/shime1.png"), minimalPngBytes() },
+    };
+    testWriteZip(archivePath, entries);
+
+    auto analysis = MascotPackage::analyzeLegacyArchive(archivePath);
+    expect(analysis.ok, "legacy archive with valid candidates should be OK");
+    expect(analysis.candidates.size() >= 3,
+        "analysis should include valid and incomplete candidates");
+
+    auto findCandidate = [&analysis](QString const& name) {
+        auto it = std::find_if(analysis.candidates.begin(), analysis.candidates.end(),
+            [&name](LegacyMascotCandidate const& candidate) {
+                return candidate.name == name || candidate.metadata.name == name;
+            });
+        return it == analysis.candidates.end() ? nullptr : &(*it);
+    };
+
+    auto *alpha = findCandidate(QStringLiteral("Alpha"));
+    expect(alpha != nullptr && alpha->convertible,
+        "valid candidate with metadata should be convertible");
+    auto *beta = findCandidate(QStringLiteral("Beta"));
+    expect(beta != nullptr && beta->convertible && beta->generatedMetadata,
+        "candidate without info.json should use fallback metadata");
+    auto *broken = findCandidate(QStringLiteral("Broken"));
+    expect(broken != nullptr && !broken->convertible &&
+        broken->errors.join(QStringLiteral(";")).contains(QStringLiteral("actions.xml")),
+        "candidate missing actions.xml should report a content error");
+
+    QFile existing(QDir(outputPath).absoluteFilePath(QStringLiteral("Alpha.mascot")));
+    expect(existing.open(QFile::WriteOnly), "existing package placeholder should be writable");
+    existing.write("existing");
+    existing.close();
+
+    auto results = MascotPackage::writeLegacyArchiveSelectionAsPackages(
+        archivePath, outputPath, QStringList {
+            QStringLiteral("Alpha"),
+            QStringLiteral("Beta"),
+        });
+    expect(results.size() == 2, "selected legacy candidates should produce two results");
+    expect(std::all_of(results.begin(), results.end(),
+        [](LegacyMascotConversionResult const& result) { return result.ok; }),
+        "selected valid candidates should convert successfully");
+
+    bool alphaAvoidedOverwrite = std::any_of(results.begin(), results.end(),
+        [](LegacyMascotConversionResult const& result) {
+            return result.name == QStringLiteral("Alpha") &&
+                result.packagePath.endsWith(QStringLiteral("Alpha-2.mascot"));
+        });
+    expect(alphaAvoidedOverwrite, "conversion should avoid overwriting existing packages");
+
+    for (auto const& result : results) {
+        MascotMetadata metadata;
+        QString error;
+        expect(MascotPackage::inspectPackage(result.packagePath, metadata, error),
+            "converted package should pass package inspection");
+    }
+}
+
 void testCommandDispatcher() {
     FakeMascotService service;
 
@@ -277,6 +479,7 @@ int main() {
     testJsonRoundTrips();
     testStatusJson();
     testMascotPackageNames();
+    testLegacyArchiveAnalysisAndConversion();
     testCommandDispatcher();
 
     if (g_failures > 0) {
