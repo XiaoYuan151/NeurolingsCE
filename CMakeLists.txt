@@ -327,6 +327,15 @@ elseif(APPLE)
     src/platform/Platform/macOS/PrivateActiveWindowObserver.mm
     src/platform/Platform/macOS/PrivateActiveWindowObserver.hpp
   )
+
+  # macOS .app bundle target (cmake --build build --target macapp)
+  set(MACAPP_TARGET        NeurolingsCE)
+  set(MACAPP_BUNDLE_NAME   "${APP_BUNDLE_NAME}")
+  set(MACAPP_BUNDLE_EXEC   "${APP_EXECUTABLE}")
+  set(MACAPP_SKELETON_DIR  "${CMAKE_CURRENT_SOURCE_DIR}/src/packaging/NeurolingsCE.app")
+  set(MACAPP_OUTPUT_DIR    "${CMAKE_CURRENT_BINARY_DIR}/macos")
+  set(MACAPP_CLI_TARGET    NeurolingsCECli)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/MacApp.cmake)
 elseif(UNIX)
   set(LINUX_TARGET NeurolingsCE)
   set(LINUX_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})

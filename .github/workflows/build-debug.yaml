@@ -24,22 +24,39 @@ jobs:
             host: linux
             qt_arch: linux_gcc_64
             qt_install_name: gcc_64
+            artifact_suffix: x86_64
+            artifact_path: build/bin/
           - name: windows-latest
             host: windows
             qt_tools: tools_mingw1310
             qt_arch: win64_mingw
             qt_install_name: mingw_64
+            artifact_suffix: x86_64
+            artifact_path: build/bin/
+          - name: macos-14
+            host: mac
+            qt_arch: clang_64
+            qt_install_name: macos
+            qt_modules: "qtmultimedia qtimageformats"
+            build_args: --target macapp
+            artifact_suffix: arm64
+            artifact_path: build/macos/
 
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: "recursive"
- 
+
       - name: Install build dependencies
         if: matrix.platform.host == 'linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libxcb-cursor0 libarchive-dev libwayland-dev wayland-protocols ccache zip
+
+      - name: Install macOS build dependencies
+        if: matrix.platform.host == 'mac'
+        run: |
+          brew install ninja
 
       - name: Install Qt6
         uses: jdpurcell/install-qt-action@v5
@@ -48,7 +65,7 @@ jobs:
           host: ${{ matrix.platform.host }}
           target: "desktop"
           arch: ${{ matrix.platform.qt_arch }}
-          modules: "qtmultimedia"
+          modules: ${{ matrix.platform.qt_modules || 'qtmultimedia' }}
           tools: ${{ matrix.platform.qt_tools || '' }}
           cache: true
 
@@ -70,11 +87,28 @@ jobs:
       - name: Build with CMake
         shell: bash
         run: |
-          cmake --build build --parallel --config Debug
+          cmake --build build --parallel --config Debug ${{ matrix.platform.build_args || '' }}
 
-      - name: Archive ${{ matrix.platform.host }} x86_64 debug build
+      - name: Package macOS .app
+        if: matrix.platform.host == 'mac'
+        shell: bash
+        run: |
+          cd build/macos
+          /usr/bin/ditto -c -k --keepParent --sequesterRsrc \
+            NeurolingsCE.app NeurolingsCE-debug-${{ matrix.platform.artifact_suffix }}.zip
+
+      - name: Archive ${{ matrix.platform.host }} ${{ matrix.platform.artifact_suffix }} debug build
+        if: matrix.platform.host != 'mac'
         uses: actions/upload-artifact@v4
         with:
-          name: debug-${{ matrix.platform.host }}-x86_64
-          path: build/bin/
+          name: debug-${{ matrix.platform.host }}-${{ matrix.platform.artifact_suffix }}
+          path: ${{ matrix.platform.artifact_path }}
+          retention-days: 1
+
+      - name: Archive ${{ matrix.platform.host }} ${{ matrix.platform.artifact_suffix }} debug build
+        if: matrix.platform.host == 'mac'
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-${{ matrix.platform.host }}-${{ matrix.platform.artifact_suffix }}
+          path: build/macos/NeurolingsCE-debug-${{ matrix.platform.artifact_suffix }}.zip
           retention-days: 1
