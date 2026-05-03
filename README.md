@@ -162,16 +162,44 @@ CONFIG=release make -j$(nproc)
 
 ### macOS
 
-1. 安装 MacPorts：
+支持 Apple Silicon（arm64）与 Intel（x86_64）。Qt6 可通过 Homebrew 或 MacPorts 安装；下面以 Homebrew 为推荐路径，因为它和 macOS 上的 CMake 流程对齐得最好。
+
+1. 安装依赖（Homebrew，推荐）：
 
 ```bash
-sudo port install qt6-qtbase qt6-qtmultimedia pkgconfig libarchive
+brew install qt qttools libarchive cmake pkg-config
 ```
 
-2. 构建：
+   或使用 MacPorts：
 
 ```bash
-CONFIG=release make -j$(nproc)
+sudo port install qt6-qtbase qt6-qtmultimedia qt6-qttools pkgconfig libarchive cmake
+```
+
+2. 构建（推荐使用 CMake，与其他平台一致）：
+
+```bash
+cmake -B build -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release \
+  -DQt6_DIR="$(brew --prefix qtbase)/lib/cmake/Qt6"
+cmake --build build -j$(sysctl -n hw.ncpu)
+```
+
+   构建产物会输出到 `build/bin/`，包括 `NeurolingsCE`、`NeurolingsCE-cli` 以及测试可执行文件 `NeurolingsCETests`。
+
+   如果使用 MacPorts，把 `Qt6_DIR` 改为 `/opt/local/libexec/qt6/lib/cmake/Qt6` 即可。
+
+3. （备选）使用顶层 Makefile：
+
+```bash
+CONFIG=release make -j$(sysctl -n hw.ncpu)
+```
+
+   `common.mk` 在 macOS 上会自动探测 Homebrew 的 `qtbase`、`qtmultimedia`、`qttools` 与 `libarchive`；如果同时安装了 MacPorts，也会回退到 `/opt/local/libexec/qt6`。如需指定其他 Qt 路径，可在命令行覆盖：
+
+```bash
+CONFIG=release make QT_MACOS_PATH=/your/Qt/lib \
+  MOC=/your/Qt/libexec/moc RCC=/your/Qt/libexec/rcc \
+  LRELEASE=/your/Qt/bin/lrelease -j$(sysctl -n hw.ncpu)
 ```
 
 ## 平台说明

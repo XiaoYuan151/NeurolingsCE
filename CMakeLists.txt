@@ -48,6 +48,14 @@ endif()
 message(STATUS "Using Qt6 from: ${Qt6_DIR}")
 message(STATUS "Qt6 version: ${Qt6_VERSION}")
 
+if(NOT TARGET Qt6::WidgetsPrivate)
+  # Modern Qt installs (Homebrew, official online installer, MSYS2, ...) ship a
+  # standalone Qt6WidgetsPrivate config. Pull it in via find_package before
+  # falling back to the manual interface target — the fallback path can pick
+  # the wrong include dir on multi-framework macOS layouts.
+  find_package(Qt6 QUIET OPTIONAL_COMPONENTS WidgetsPrivate)
+endif()
+
 if(NOT TARGET Qt6::WidgetsPrivate)  # hack for ElaWidgetTools/ElaWidgetTools/CmakeLists.txt
   message(STATUS "Qt6WidgetsPrivate not provided by Qt SDK, creating fallback target")
   add_library(Qt6::WidgetsPrivate INTERFACE IMPORTED)

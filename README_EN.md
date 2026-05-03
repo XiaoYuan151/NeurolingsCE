@@ -162,16 +162,44 @@ CONFIG=release make -j$(nproc)
 
 ### macOS
 
-1. Install dependencies via MacPorts:
+Apple Silicon (arm64) and Intel (x86_64) are both supported. Qt6 can come from either Homebrew or MacPorts; Homebrew is the recommended path because it lines up best with the CMake-based build flow used on the other platforms.
+
+1. Install dependencies (Homebrew, recommended):
 
 ```bash
-sudo port install qt6-qtbase qt6-qtmultimedia pkgconfig libarchive
+brew install qt qttools libarchive cmake pkg-config
 ```
 
-2. Build:
+   Or with MacPorts:
 
 ```bash
-CONFIG=release make -j$(nproc)
+sudo port install qt6-qtbase qt6-qtmultimedia qt6-qttools pkgconfig libarchive cmake
+```
+
+2. Build (CMake — preferred, matches the other platforms):
+
+```bash
+cmake -B build -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release \
+  -DQt6_DIR="$(brew --prefix qtbase)/lib/cmake/Qt6"
+cmake --build build -j$(sysctl -n hw.ncpu)
+```
+
+   Output binaries land in `build/bin/`: `NeurolingsCE`, `NeurolingsCE-cli`, plus the `NeurolingsCETests` test runner.
+
+   For MacPorts, set `Qt6_DIR=/opt/local/libexec/qt6/lib/cmake/Qt6` instead.
+
+3. (Alternative) Top-level Makefile:
+
+```bash
+CONFIG=release make -j$(sysctl -n hw.ncpu)
+```
+
+   `common.mk` auto-detects Homebrew's `qtbase`, `qtmultimedia`, `qttools`, and `libarchive` on macOS, and falls back to `/opt/local/libexec/qt6` if MacPorts is the only Qt install. To point at a different Qt, override on the command line:
+
+```bash
+CONFIG=release make QT_MACOS_PATH=/your/Qt/lib \
+  MOC=/your/Qt/libexec/moc RCC=/your/Qt/libexec/rcc \
+  LRELEASE=/your/Qt/bin/lrelease -j$(sysctl -n hw.ncpu)
 ```
 
 ## Platform Notes
