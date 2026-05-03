@@ -40,7 +40,23 @@ jobs:
             artifact_name: windows-x86_64
             artifact_path: build/bin/
 
-          # TODO: macos build
+          - runner: macos-14
+            host: mac
+            qt_arch: clang_64
+            qt_install_name: macos
+            qt_modules: "qtmultimedia qtimageformats"
+            build_args: --target macapp
+            artifact_name: macos-arm64
+            artifact_path: build/macos/
+
+          - runner: macos-13
+            host: mac
+            qt_arch: clang_64
+            qt_install_name: macos
+            qt_modules: "qtmultimedia qtimageformats"
+            build_args: --target macapp
+            artifact_name: macos-x86_64
+            artifact_path: build/macos/
 
     steps:
       - uses: actions/checkout@v4
@@ -56,6 +72,11 @@ jobs:
             sudo apt-get install -y libgstreamer-plugins-bad1.0-0 libgstreamer-plugins-good1.0-0
           fi
 
+      - name: Install macOS build dependencies
+        if: matrix.platform.host == 'mac'
+        run: |
+          brew install ninja
+
       - name: Install Qt6
         uses: jdpurcell/install-qt-action@v5
         with:
@@ -63,7 +84,7 @@ jobs:
           host: ${{ matrix.platform.host }}
           target: "desktop"
           arch: ${{ matrix.platform.qt_arch }}
-          modules: "qtmultimedia"
+          modules: ${{ matrix.platform.qt_modules || 'qtmultimedia' }}
           tools: ${{ matrix.platform.qt_tools || '' }}
           cache: true
 
@@ -110,11 +131,32 @@ jobs:
           powershell -ExecutionPolicy Bypass -File .\installer\wix\build-msi.ps1 -WixExe "$env:USERPROFILE\.dotnet\tools\wix.exe"
           powershell -ExecutionPolicy Bypass -File .\installer\wix\build-bundle.ps1 -WixExe "$env:USERPROFILE\.dotnet\tools\wix.exe"
 
+      # actions/upload-artifact zips inputs but does not preserve macOS bundle
+      # symlinks/permissions reliably across the round-trip. Pre-zip the .app
+      # ourselves so the produced archive can be expanded into a working bundle.
+      - name: Package macOS .app
+        if: matrix.platform.host == 'mac'
+        shell: bash
+        run: |
+          cp -R licenses build/macos/NeurolingsCE.app/Contents/Resources/
+          cd build/macos
+          /usr/bin/ditto -c -k --keepParent --sequesterRsrc \
+            NeurolingsCE.app NeurolingsCE-${{ matrix.platform.artifact_name }}.zip
+
       - name: Archive ${{ matrix.platform.artifact_name }} release build
+        if: matrix.platform.host != 'mac'
         uses: actions/upload-artifact@v4
         with:
           name: release-${{ matrix.platform.artifact_name }}
           path: ${{ matrix.platform.artifact_path }}
+          retention-days: 1
+
+      - name: Archive ${{ matrix.platform.artifact_name }} release build
+        if: matrix.platform.host == 'mac'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.platform.artifact_name }}
+          path: build/macos/NeurolingsCE-${{ matrix.platform.artifact_name }}.zip
           retention-days: 1
 
       - name: Archive Windows installer artifacts
@@ -128,49 +170,3 @@ jobs:
             out/installer/*-setup.exe
           retention-days: 1
 
-  build-macos:
-    runs-on: macos-14
-    if: false
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: "recursive"
-      - name: Temporarily let gtar run as root
-        run: |
-          sudo chown 0:0 /opt/homebrew/bin/gtar
-          sudo chmod u+s /opt/homebrew/bin/gtar
-      - name: Cache Qt6
-        id: cache-qt6
-        uses: actions/cache@v4
-        with:
-          path: /opt/local
-          key: macos-14-macports-qt6
-      - name: Revoke gtar's root permissions
-        run: |
-          sudo chmod u-s /opt/homebrew/bin/gtar
-      - name: Install Qt6
-        if: steps.cache-qt6.outputs.cache-hit != 'true'
-        run: |
-          wget --no-verbose https://github.com/macports/macports-base/releases/download/v2.10.5/MacPorts-2.10.5-14-Sonoma.pkg
-          sudo installer -pkg MacPorts-2.10.5-14-Sonoma.pkg -target /
-          export PATH=/opt/local/bin:/opt/local/sbin:$PATH
-          yes | sudo port install qt6-qtbase qt6-qtmultimedia pkgconfig libarchive
-          sudo rm -rf /opt/local/var/macports/build/*
-          sudo rm -rf /opt/local/var/macports/distfiles/*
-      - name: Expose MacPorts tools
-        run: |
-          echo "PATH=/opt/local/bin:/opt/local/sbin:$PATH" >> $GITHUB_ENV
-      - name: Build macOS arm64 release build
-        env:
-          CONFIG: release
-        run: |
-          make clean
-          make -j6
-          make macapp
-          cp -r licenses publish/macOS/release/
-      - name: Archive macOS arm64 release build
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-macos-arm64
-          path: publish/macOS/release
-          retention-days: 1

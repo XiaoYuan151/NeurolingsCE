@@ -191,16 +191,17 @@ appimage: publish/Linux/$(CONFIG)/NeurolingsCE.AppImage
 macapp: publish/macOS/$(CONFIG)/NeurolingsCE.app
 
 $(APP_EXECUTABLE)$(EXE): src/platform/Platform/Platform.a libshimejifinder/build/libshimejifinder.a \
+	libshimejifinder/build/pugixml/libpugixml.a \
 	ElaWidgetTools/build/ElaWidgetTools/libElaWidgetTools.a $(APP_EXECUTABLE).a \
 	src/packaging/io.github.qingchenyouforcc.NeurolingsCE.metainfo.xml \
 	src/resources/resources.rc \
 	src/platform/Platform/Linux/gnome_script/metadata.json
-	$(CXX) -o $@ $(LD_COPY_NEEDED) $(LD_WHOLE_ARCHIVE) $^ $(LD_NO_WHOLE_ARCHIVE) \
+	$(CXX) -o $@ $(LD_COPY_NEEDED) $(LD_WHOLE_ARCHIVE) $(filter %.o %.a,$^) $(LD_NO_WHOLE_ARCHIVE) \
 		$(TARGET_LDFLAGS) $(LDFLAGS)
 	if [ $(CONFIG) = "release" ]; then $(STRIP) $@; fi
 
-$(CLI_EXECUTABLE)$(EXE): $(CLI_OBJECTS) libshimejifinder/build/libshimejifinder.a
-	$(CXX) -o $@ $^ $(TARGET_LDFLAGS) $(LDFLAGS)
+$(CLI_EXECUTABLE)$(EXE): $(CLI_OBJECTS) libshimejifinder/build/libshimejifinder.a libshimejifinder/build/pugixml/libpugixml.a
+	$(CXX) -o $@ $(filter %.o %.a,$^) $(TARGET_LDFLAGS) $(LDFLAGS)
 	if [ $(CONFIG) = "release" ]; then $(STRIP) $@; fi
 
 DefaultMascot.cc: $(DEFAULT_MASCOT_FILES) Makefile src/tools/bundle-default.sh
@@ -269,6 +270,8 @@ libshimejifinder/build/libshimejifinder.a: libshimejifinder/build/Makefile
 	$(MAKE) -C libshimejifinder/build
 	if [ $(PLATFORM) = "Windows" ]; then cp libshimejifinder/build/unarr/libunarr.so.1.1.0 \
 		libshimejifinder/build/unarr/libunarr.dll; fi
+
+libshimejifinder/build/pugixml/libpugixml.a: libshimejifinder/build/libshimejifinder.a
 
 ElaWidgetTools/build/Makefile: ElaWidgetTools/ElaWidgetTools/CMakeLists.txt cmake/ElaWidgetToolsBuild/CMakeLists.txt FORCE
 ifeq ($(PLATFORM),Windows)

@@ -1,30 +1,30 @@
 function(load_version FILE)
   file(STRINGS "${FILE}" VERSION_LINES)
 
-  set(VERSION "")
-  set(VERSION_MAJOR "")
-  set(VERSION_MINOR "")
-  set(VERSION_PATCH "")
-  set(RELEASE_DATE "")
+  set(_keys
+    VERSION VERSION_MAJOR VERSION_MINOR VERSION_PATCH VERSION_NAME RELEASE_DATE
+    APP_NAME APP_DISPLAY_NAME APP_EXECUTABLE APP_DESCRIPTION
+    APP_COMPANY APP_COPYRIGHT
+    APP_BUNDLE_ID APP_BUNDLE_NAME
+    APP_ICON_NAME APP_DESKTOP_CATEGORIES
+    EXTENSION_UUID EXTENSION_NAME EXTENSION_DESCRIPTION
+  )
 
-  foreach(LINE ${VERSION_LINES})
-    if(LINE MATCHES "^VERSION=(.*)$")
-      set(VERSION "${CMAKE_MATCH_1}")
-    elseif(LINE MATCHES "^VERSION_MAJOR=(.*)$")
-      set(VERSION_MAJOR "${CMAKE_MATCH_1}")
-    elseif(LINE MATCHES "^VERSION_MINOR=(.*)$")
-      set(VERSION_MINOR "${CMAKE_MATCH_1}")
-    elseif(LINE MATCHES "^VERSION_PATCH=(.*)$")
-      set(VERSION_PATCH "${CMAKE_MATCH_1}")
-    elseif(LINE MATCHES "^RELEASE_DATE=(.*)$")
-      set(RELEASE_DATE "${CMAKE_MATCH_1}")
-    endif()
+  foreach(_key IN LISTS _keys)
+    set(${_key} "")
   endforeach()
 
-  set(VERSION "${VERSION}" PARENT_SCOPE)
-  set(VERSION_MAJOR "${VERSION_MAJOR}" PARENT_SCOPE)
-  set(VERSION_MINOR "${VERSION_MINOR}" PARENT_SCOPE)
-  set(VERSION_PATCH "${VERSION_PATCH}" PARENT_SCOPE)
-  set(RELEASE_DATE "${RELEASE_DATE}" PARENT_SCOPE)
+  foreach(LINE ${VERSION_LINES})
+    foreach(_key IN LISTS _keys)
+      if(LINE MATCHES "^${_key}=(.*)$")
+        set(${_key} "${CMAKE_MATCH_1}")
+        break()
+      endif()
+    endforeach()
+  endforeach()
+
+  foreach(_key IN LISTS _keys)
+    set(${_key} "${${_key}}" PARENT_SCOPE)
+  endforeach()
   set(PROJECT_VERSION "${VERSION}" PARENT_SCOPE)
 endfunction()

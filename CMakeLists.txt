@@ -48,6 +48,14 @@ endif()
 message(STATUS "Using Qt6 from: ${Qt6_DIR}")
 message(STATUS "Qt6 version: ${Qt6_VERSION}")
 
+if(NOT TARGET Qt6::WidgetsPrivate)
+  # Modern Qt installs (Homebrew, official online installer, MSYS2, ...) ship a
+  # standalone Qt6WidgetsPrivate config. Pull it in via find_package before
+  # falling back to the manual interface target — the fallback path can pick
+  # the wrong include dir on multi-framework macOS layouts.
+  find_package(Qt6 QUIET OPTIONAL_COMPONENTS WidgetsPrivate)
+endif()
+
 if(NOT TARGET Qt6::WidgetsPrivate)  # hack for ElaWidgetTools/ElaWidgetTools/CmakeLists.txt
   message(STATUS "Qt6WidgetsPrivate not provided by Qt SDK, creating fallback target")
   add_library(Qt6::WidgetsPrivate INTERFACE IMPORTED)
@@ -319,6 +327,15 @@ elseif(APPLE)
     src/platform/Platform/macOS/PrivateActiveWindowObserver.mm
     src/platform/Platform/macOS/PrivateActiveWindowObserver.hpp
   )
+
+  # macOS .app bundle target (cmake --build build --target macapp)
+  set(MACAPP_TARGET        NeurolingsCE)
+  set(MACAPP_BUNDLE_NAME   "${APP_BUNDLE_NAME}")
+  set(MACAPP_BUNDLE_EXEC   "${APP_EXECUTABLE}")
+  set(MACAPP_SKELETON_DIR  "${CMAKE_CURRENT_SOURCE_DIR}/src/packaging/NeurolingsCE.app")
+  set(MACAPP_OUTPUT_DIR    "${CMAKE_CURRENT_BINARY_DIR}/macos")
+  set(MACAPP_CLI_TARGET    NeurolingsCECli)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/MacApp.cmake)
 elseif(UNIX)
   set(LINUX_TARGET NeurolingsCE)
   set(LINUX_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})

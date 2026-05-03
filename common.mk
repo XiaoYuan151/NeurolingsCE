@@ -23,10 +23,42 @@ export QMAKE
 
 CONFIG ?= release
 STRIP ?= strip
-PKG_CONFIG ?= pkg-config
 WINDRES ?= $(patsubst %-windres,%-gcc,$(CC))
 AR ?= ar
 CMAKE ?= cmake
+UNAME_S_DETECT := $(shell uname -s)
+ifeq ($(UNAME_S_DETECT),Darwin)
+	# Homebrew puts moc/rcc under qtbase/share/qt/libexec; lrelease ships in qttools.
+	HOMEBREW_QTBASE_LIBEXEC := $(wildcard /opt/homebrew/opt/qtbase/share/qt/libexec)
+	HOMEBREW_LRELEASE := $(wildcard /opt/homebrew/bin/lrelease)
+	ifneq ($(HOMEBREW_QTBASE_LIBEXEC),)
+		MOC ?= $(HOMEBREW_QTBASE_LIBEXEC)/moc
+		RCC ?= $(HOMEBREW_QTBASE_LIBEXEC)/rcc
+	endif
+	ifneq ($(HOMEBREW_LRELEASE),)
+		LRELEASE ?= $(HOMEBREW_LRELEASE)
+	endif
+	# Surface Homebrew keg-only packages (qtbase, qtmultimedia, libarchive) to
+	# pkg-config. Bake `--with-path=...` into PKG_CONFIG so make's own
+	# $(shell pkg-config ...) invocations see the override (a plain make
+	# `export` only reaches recipe sub-shells, not $(shell ...)).
+	HOMEBREW_PKGCONFIG_PATHS := $(wildcard \
+		/opt/homebrew/opt/qtbase/lib/pkgconfig \
+		/opt/homebrew/opt/qtmultimedia/lib/pkgconfig \
+		/opt/homebrew/opt/libarchive/lib/pkgconfig)
+	ifneq ($(HOMEBREW_PKGCONFIG_PATHS),)
+		empty :=
+		space := $(empty) $(empty)
+		HOMEBREW_PKGCONFIG_PATH := $(subst $(space),:,$(HOMEBREW_PKGCONFIG_PATHS))
+		# pkgconf 2.x's --with-path takes one directory per flag (it does not
+		# accept colon-separated lists), so emit one flag per path.
+		HOMEBREW_PKGCONFIG_FLAGS := $(addprefix --with-path=,$(HOMEBREW_PKGCONFIG_PATHS))
+		PKG_CONFIG ?= pkg-config $(HOMEBREW_PKGCONFIG_FLAGS)
+		export PKG_CONFIG_PATH := $(HOMEBREW_PKGCONFIG_PATH)$(if $(PKG_CONFIG_PATH),:$(PKG_CONFIG_PATH))
+	endif
+endif
+PKG_CONFIG ?= pkg-config
+
 RCC ?= $(shell pkg-config Qt$(QT_VERSION)Core --variable=rcc 2>/dev/null || echo rcc)
 LRELEASE ?= $(shell pkg-config Qt$(QT_VERSION)Core --variable=lrelease 2>/dev/null || echo lrelease)
 
@@ -83,7 +115,17 @@ ifeq ($(PLATFORM),macOS)
 endif
 
 ifeq ($(PLATFORM),macOS)
-	QT_MACOS_PATH := /opt/local/libexec/qt$(QT_VERSION)/lib
+	# Auto-detect Qt6 location: prefer Homebrew's framework symlink dir, fall
+	# back to MacPorts. Override QT_MACOS_PATH=... on the make command line
+	# for a custom install.
+	ifeq ($(wildcard /opt/local/libexec/qt$(QT_VERSION)/lib/QtCore.framework),)
+		ifneq ($(wildcard /opt/homebrew/lib/QtCore.framework),)
+			QT_MACOS_PATH ?= /opt/homebrew/lib
+		else ifneq ($(wildcard /usr/local/lib/QtCore.framework),)
+			QT_MACOS_PATH ?= /usr/local/lib
+		endif
+	endif
+	QT_MACOS_PATH ?= /opt/local/libexec/qt$(QT_VERSION)/lib
 	QT_FRAMEWORKS = $(addsuffix .framework,$(addprefix -I$(QT_MACOS_PATH)/Qt,$(QT_LIBS)))
 	QT_CFLAGS = -F$(QT_MACOS_PATH) $(addsuffix /Versions/Current/Headers,$(QT_FRAMEWORKS))
 	QT_LDFLAGS = -F$(QT_MACOS_PATH) $(addprefix -framework Qt,$(QT_LIBS))

@@ -121,6 +121,15 @@ add_library(
     ${DEFAULT_ACTIONS_CC}
     ${DEFAULT_BEHAVIORS_CC}
 )
+# default_actions.cc / default_behaviors.cc are #include-d directly from
+# archive.cc; they are listed in the source list above only so CMake will
+# trigger the generator add_custom_command. Skip standalone compilation
+# (they expose unused static arrays at TU scope, which trips -Werror).
+set_source_files_properties(
+    ${DEFAULT_ACTIONS_CC}
+    ${DEFAULT_BEHAVIORS_CC}
+    PROPERTIES HEADER_FILE_ONLY TRUE
+)
 target_include_directories(
     shimejifinder PRIVATE
     ${LIBSHIMEJIFINDER_SOURCE_DIR}
